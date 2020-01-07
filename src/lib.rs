@@ -1,4 +1,5 @@
 pub mod errors;
+mod tokenize;
 
 use crate::errors::MiniYamlError;
 
