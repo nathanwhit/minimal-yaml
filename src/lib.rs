@@ -11,9 +11,9 @@ pub enum Yaml<'a> {
     Scalar(&'a str),
 
     /// A sequence of values in flow style
-    /// ```[x, y, z]```
+    /// `[x, y, z]`
     /// or in block style
-    /// ```
+    /// ```yaml
     ///     - x
     ///     - y
     ///     - z
@@ -21,9 +21,9 @@ pub enum Yaml<'a> {
     Sequence(Vec<Yaml<'a>>),
 
     /// A mapping from key to value in flow style
-    /// ```{x: X, y: Y, z: Z}```
+    /// `{x: X, y: Y, z: Z}`
     /// or in block style
-    /// ```
+    /// ```yaml
     ///     x: X
     ///     y: Y
     ///     z: Z

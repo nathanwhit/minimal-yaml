@@ -10,14 +10,18 @@ pub enum MiniYamlError {
     TagsDisallowed,
 }
 
-impl std::error::Error for MiniYamlError { }
+impl std::error::Error for MiniYamlError {}
 
 impl fmt::Display for MiniYamlError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", match self {
-            MiniYamlError::AliasesDisallowed => "aliases are disallowed in minimal-yaml",
-            MiniYamlError::AnchorsDisallowed => "anchors are disallowed in minimal-yaml",
-            MiniYamlError::TagsDisallowed => "tags are disallowed in minimal-yaml",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                MiniYamlError::AliasesDisallowed => "aliases are disallowed in minimal-yaml",
+                MiniYamlError::AnchorsDisallowed => "anchors are disallowed in minimal-yaml",
+                MiniYamlError::TagsDisallowed => "tags are disallowed in minimal-yaml",
+            }
+        )
     }
 }
