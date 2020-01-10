@@ -1,7 +1,7 @@
 pub mod errors;
 mod tokenize;
 
-use crate::errors::MiniYamlError;
+pub use crate::errors::MiniYamlError;
 
 pub(crate) type Result<T> = std::result::Result<T, MiniYamlError>;
 
@@ -39,7 +39,7 @@ pub struct Entry<'a> {
     value: Yaml<'a>,
 }
 
-/// Parse Yaml input. Returns the top level Yaml element on success, 
+/// Parse Yaml input. Returns the top level Yaml element on success,
 /// or a ```MiniYamlError``` on failure
 pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
     unimplemented!()
