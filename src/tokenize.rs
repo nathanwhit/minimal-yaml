@@ -1,5 +1,6 @@
 #![allow(unused)]
 use super::Result;
+use crate::MiniYamlError;
 use core::fmt;
 use core::iter::{Iterator, Peekable};
 use core::ops::{Add, AddAssign};
@@ -14,6 +15,16 @@ struct Span {
     start: ByteIdx,
     end: ByteIdx,
 }
+
+impl Span {
+    fn new<T: Into<ByteIdx>>(start: T, end: T) -> Self {
+        Self {
+            start: start.into(),
+            end: end.into(),
+        }
+    }
+}
+
 impl ByteIdx {
     /// Returns a span from the current byte index
     /// to `other`.
@@ -210,6 +221,17 @@ impl From<&(usize, char)> for SourceChar {
     }
 }
 
+struct SourceStr<'a> {
+    slice: &'a str,
+    span: Span,
+}
+
+impl<'a> SourceStr<'a> {
+    pub fn new(slice: &'a str, span: Span) -> Self {
+        Self { slice, span }
+    }
+}
+
 impl<'a> Tokenizer<'a> {
     /// Returns the next character, if one exists, without advancing
     /// the source position.
@@ -236,16 +258,23 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn consume_whitespace(&mut self, start: &SourceChar) -> Token<'a> {
-        let (val, span) = self.consume_matches(start, |chr| chr == ' ' || chr == '\t');
-        Token::new(TokenKind::Whitespace(val), span)
+        let SourceStr { slice, span } =
+            self.consume_matches(start, |chr| chr == ' ' || chr == '\t');
+        Token::new(TokenKind::Whitespace(slice), span)
     }
 
     fn consume_literal(&mut self, start: &SourceChar) -> Token<'a> {
-        let (val, span) = self.consume_matches(start, |chr| chr.is_alphanumeric() || chr == '.');
-        Token::new(TokenKind::Literal(val), span)
+        let SourceStr { slice, span } = self.consume_matches(start, |chr| {
+            chr.is_alphanumeric() || chr == '.' || chr == '_'
+        });
+        Token::new(TokenKind::Literal(slice), span)
     }
 
-    fn consume_matches(&mut self, start: &SourceChar, matches: impl Fn(char) -> bool) -> (&'a str, Span) {
+    fn consume_matches(
+        &mut self,
+        start: &SourceChar,
+        matches: impl Fn(char) -> bool,
+    ) -> SourceStr<'a> {
         let tok_start = start.idx;
         let mut tok_end = start.end();
         loop {
@@ -255,10 +284,44 @@ impl<'a> Tokenizer<'a> {
                     self.advance();
                 }
                 _ => {
-                    return (&self.source[tok_start.into()..tok_end.into()], tok_start.to(tok_end))
+                    return SourceStr::new(
+                        &self.source[tok_start.into()..tok_end.into()],
+                        tok_start.to(tok_end),
+                    )
                 }
             }
         }
+    }
+
+    fn consume_until(
+        &mut self,
+        start: &SourceChar,
+        end_cond: impl Fn(char) -> bool,
+    ) -> SourceStr<'a> {
+        let tok_start = start.end();
+        let mut tok_end = start.end();
+        loop {
+            match self.peek() {
+                Some(chr) => {
+                    tok_end = chr.end();
+                    self.advance();
+                    if chr.value == '\\' {
+                        if let Some(next_chr) = self.peek() {
+                            tok_end = next_chr.end();
+                            self.advance();
+                        }
+                    }
+                    if end_cond(chr.value) {
+                        break;
+                    }
+                }
+                _ => break,
+            }
+        }
+        SourceStr::new(
+            &self.source[tok_start.into()..tok_end.into()],
+            tok_start.to(tok_end),
+        )
     }
 
     fn chomp_whitespace(&mut self, start: &SourceChar) {
@@ -270,15 +333,26 @@ impl<'a> Tokenizer<'a> {
     pub fn tokenize(mut self) -> Vec<Token<'a>> {
         use TokenKind::*;
         while let Some(chr) = self.next_char() {
-            println!("{:?}", chr);
             match chr.value {
                 '&' => self.push_tok_with(Ampersand, chr.span()),
                 '*' => self.push_tok_with(Asterisk, chr.span()),
-                ':' => self.push_tok_with(Colon, chr.span()),
-                ',' => self.push_tok_with(Comma, chr.span()),
-                '-' => self.push_tok_with(Dash, chr.span()),
+                ':' => {
+                    self.push_tok_with(Colon, chr.span());
+                    self.chomp_whitespace(&chr);
+                }
+                ',' => {
+                    self.push_tok_with(Comma, chr.span());
+                    self.chomp_whitespace(&chr);
+                }
+                '-' => {
+                    self.push_tok_with(Dash, chr.span());
+                    self.chomp_whitespace(&chr);
+                }
                 '.' => self.push_tok_with(Dot, chr.span()),
-                '\"' => self.push_tok_with(DoubleQuote, chr.span()),
+                '\"' => {
+                    let lit = self.consume_until(&chr, |c| c == '\"');
+                    self.push_tok_with(Literal(lit.slice), lit.span);
+                }
                 '>' => self.push_tok_with(Fold, chr.span()),
                 '\n' | '\r' => self.push_tok_with(Newline, chr.span()),
                 '{' => self.push_tok_with(LeftBrace, chr.span()),
@@ -287,14 +361,22 @@ impl<'a> Tokenizer<'a> {
                 '+' => self.push_tok_with(Plus, chr.span()),
                 '}' => self.push_tok_with(RightBrace, chr.span()),
                 ']' => self.push_tok_with(RightBracket, chr.span()),
-                '\'' => self.push_tok_with(SingleQuote, chr.span()),
+                '\'' => {
+                    let SourceStr { slice, span } = self.consume_until(&chr, |c| c == '\'');
+                    self.push_tok_with(Literal(slice), span);
+                }
                 '\t' | ' ' => {
                     let tok = self.consume_whitespace(&chr);
                     self.push_tok(tok);
                 }
                 _ => {
-                    let tok = self.consume_literal(&chr);
-                    self.push_tok(tok);
+                    if let Token {
+                        kind: Literal(slice),
+                        span,
+                    } = self.consume_literal(&chr)
+                    {
+                        self.push_tok_with(Literal(slice), span);
+                    }
                 }
             }
         }
