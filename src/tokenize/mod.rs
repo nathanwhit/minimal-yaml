@@ -158,11 +158,24 @@ impl<'a> fmt::Display for TokenKind<'a> {
     }
 }
 
-impl<'a> TokenKind<'a> {}
+impl<'a> Default for TokenKind<'a> {
+    fn default() -> Self {
+        Self::Dummy
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Token<'a> {
     kind: TokenKind<'a>,
     span: Span,
+}
+
+impl<'a> Default for Token<'a> {
+    fn default() -> Self {
+        Self {
+            kind: TokenKind::Dummy,
+            span: Span::dummy(),
+        }
+    }
 }
 
 impl<'a> Token<'a> {
