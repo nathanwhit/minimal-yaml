@@ -4,14 +4,15 @@ use crate::MiniYamlError;
 use core::fmt;
 use core::iter::{Iterator, Peekable};
 use core::ops::{Add, AddAssign};
+mod tests;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ByteIdx(usize);
+pub(crate) struct ByteIdx(usize);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ByteLen(usize);
+pub(crate) struct ByteLen(usize);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Span {
+pub(crate) struct Span {
     start: ByteIdx,
     end: ByteIdx,
 }
@@ -22,6 +23,10 @@ impl Span {
             start: start.into(),
             end: end.into(),
         }
+    }
+
+    pub(crate) fn dummy() -> Self {
+        Self::new(0, 0)
     }
 }
 
@@ -100,7 +105,7 @@ impl Add<ByteLen> for ByteLen {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum TokenKind<'a> {
+pub(crate) enum TokenKind<'a> {
     Literal(&'a str),
     Whitespace(&'a str),
     Ampersand,
@@ -119,6 +124,7 @@ enum TokenKind<'a> {
     RightBracket,
     SingleQuote,
     DoubleQuote,
+    Dummy,
 }
 
 impl<'a> fmt::Display for TokenKind<'a> {
@@ -146,6 +152,7 @@ impl<'a> fmt::Display for TokenKind<'a> {
                 RightBracket => "]",
                 SingleQuote => r"'",
                 DoubleQuote => r#"""#,
+                Dummy => "DUMMY",
             }
         )
     }
@@ -153,21 +160,28 @@ impl<'a> fmt::Display for TokenKind<'a> {
 
 impl<'a> TokenKind<'a> {}
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Token<'a> {
+pub(crate) struct Token<'a> {
     kind: TokenKind<'a>,
     span: Span,
 }
 
 impl<'a> Token<'a> {
     /// Constructs a new token.
-    fn new(kind: TokenKind<'a>, span: Span) -> Self {
+    pub(crate) fn new(kind: TokenKind<'a>, span: Span) -> Self {
         Self { kind, span }
+    }
+
+    pub(crate) fn is_quote(&self) -> bool {
+        match self.kind {
+            TokenKind::DoubleQuote | TokenKind::SingleQuote => true,
+            _ => false
+        }
     }
 }
 
 use core::str::CharIndices;
 
-struct Tokenizer<'a> {
+pub(crate) struct Tokenizer<'a> {
     source: &'a str,
     chars: Peekable<CharIndices<'a>>,
     tokens: Vec<Token<'a>>,
@@ -349,10 +363,7 @@ impl<'a> Tokenizer<'a> {
                     self.chomp_whitespace(&chr);
                 }
                 '.' => self.push_tok_with(Dot, chr.span()),
-                '\"' => {
-                    let lit = self.consume_until(&chr, |c| c == '\"');
-                    self.push_tok_with(Literal(lit.slice), lit.span);
-                }
+                '\"' => self.push_tok_with(DoubleQuote, chr.span()),
                 '>' => self.push_tok_with(Fold, chr.span()),
                 '\n' | '\r' => self.push_tok_with(Newline, chr.span()),
                 '{' => self.push_tok_with(LeftBrace, chr.span()),
@@ -361,10 +372,7 @@ impl<'a> Tokenizer<'a> {
                 '+' => self.push_tok_with(Plus, chr.span()),
                 '}' => self.push_tok_with(RightBrace, chr.span()),
                 ']' => self.push_tok_with(RightBracket, chr.span()),
-                '\'' => {
-                    let SourceStr { slice, span } = self.consume_until(&chr, |c| c == '\'');
-                    self.push_tok_with(Literal(slice), span);
-                }
+                '\'' => self.push_tok_with(SingleQuote, chr.span()),
                 '\t' | ' ' => {
                     let tok = self.consume_whitespace(&chr);
                     self.push_tok(tok);
@@ -391,210 +399,4 @@ impl<'a> Tokenizer<'a> {
     fn push_tok_with(&mut self, kind: TokenKind<'a>, span: Span) {
         self.tokens.push(Token::new(kind, span))
     }
-}
-
-#[test]
-fn test_list() {
-    use TokenKind::*;
-    const INPUT: &str = r"list: [val1, val2, val3]
-    flow_list:
-        - val1
-        - val2
-        - val3
-    ";
-    let mut tokenizer = Tokenizer::from_str(INPUT);
-    let tokens = tokenizer.tokenize();
-    println!("{:?}", tokens);
-    let expected = vec![
-        Token {
-            kind: Literal("list"),
-            span: Span {
-                start: ByteIdx(0),
-                end: ByteIdx(4),
-            },
-        },
-        Token {
-            kind: Colon,
-            span: Span {
-                start: ByteIdx(4),
-                end: ByteIdx(5),
-            },
-        },
-        Token {
-            kind: LeftBracket,
-            span: Span {
-                start: ByteIdx(6),
-                end: ByteIdx(7),
-            },
-        },
-        Token {
-            kind: Literal("val1"),
-            span: Span {
-                start: ByteIdx(7),
-                end: ByteIdx(11),
-            },
-        },
-        Token {
-            kind: Comma,
-            span: Span {
-                start: ByteIdx(11),
-                end: ByteIdx(12),
-            },
-        },
-        Token {
-            kind: Literal("val2"),
-            span: Span {
-                start: ByteIdx(13),
-                end: ByteIdx(17),
-            },
-        },
-        Token {
-            kind: Comma,
-            span: Span {
-                start: ByteIdx(17),
-                end: ByteIdx(18),
-            },
-        },
-        Token {
-            kind: Literal("val3"),
-            span: Span {
-                start: ByteIdx(19),
-                end: ByteIdx(23),
-            },
-        },
-        Token {
-            kind: RightBracket,
-            span: Span {
-                start: ByteIdx(23),
-                end: ByteIdx(24),
-            },
-        },
-        Token {
-            kind: Newline,
-            span: Span {
-                start: ByteIdx(24),
-                end: ByteIdx(25),
-            },
-        },
-        Token {
-            kind: Whitespace("    "),
-            span: Span {
-                start: ByteIdx(25),
-                end: ByteIdx(29),
-            },
-        },
-        Token {
-            kind: Literal("flow_list"),
-            span: Span {
-                start: ByteIdx(29),
-                end: ByteIdx(38),
-            },
-        },
-        Token {
-            kind: Colon,
-            span: Span {
-                start: ByteIdx(38),
-                end: ByteIdx(39),
-            },
-        },
-        Token {
-            kind: Newline,
-            span: Span {
-                start: ByteIdx(39),
-                end: ByteIdx(40),
-            },
-        },
-        Token {
-            kind: Whitespace("        "),
-            span: Span {
-                start: ByteIdx(40),
-                end: ByteIdx(48),
-            },
-        },
-        Token {
-            kind: Dash,
-            span: Span {
-                start: ByteIdx(48),
-                end: ByteIdx(49),
-            },
-        },
-        Token {
-            kind: Literal("val1"),
-            span: Span {
-                start: ByteIdx(50),
-                end: ByteIdx(54),
-            },
-        },
-        Token {
-            kind: Newline,
-            span: Span {
-                start: ByteIdx(54),
-                end: ByteIdx(55),
-            },
-        },
-        Token {
-            kind: Whitespace("        "),
-            span: Span {
-                start: ByteIdx(55),
-                end: ByteIdx(63),
-            },
-        },
-        Token {
-            kind: Dash,
-            span: Span {
-                start: ByteIdx(63),
-                end: ByteIdx(64),
-            },
-        },
-        Token {
-            kind: Literal("val2"),
-            span: Span {
-                start: ByteIdx(65),
-                end: ByteIdx(69),
-            },
-        },
-        Token {
-            kind: Newline,
-            span: Span {
-                start: ByteIdx(69),
-                end: ByteIdx(70),
-            },
-        },
-        Token {
-            kind: Whitespace("        "),
-            span: Span {
-                start: ByteIdx(70),
-                end: ByteIdx(78),
-            },
-        },
-        Token {
-            kind: Dash,
-            span: Span {
-                start: ByteIdx(78),
-                end: ByteIdx(79),
-            },
-        },
-        Token {
-            kind: Literal("val3"),
-            span: Span {
-                start: ByteIdx(80),
-                end: ByteIdx(84),
-            },
-        },
-        Token {
-            kind: Newline,
-            span: Span {
-                start: ByteIdx(84),
-                end: ByteIdx(85),
-            },
-        },
-        Token {
-            kind: Whitespace("    "),
-            span: Span {
-                start: ByteIdx(85),
-                end: ByteIdx(89),
-            },
-        },
-    ];
-    assert_eq!(expected, tokens)
 }
