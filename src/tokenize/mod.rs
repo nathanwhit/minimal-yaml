@@ -107,7 +107,7 @@ impl Add<ByteLen> for ByteLen {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TokenKind<'a> {
     Literal(&'a str),
-    Whitespace(&'a str),
+    Whitespace(usize),
     Ampersand,
     Asterisk,
     Colon,
@@ -135,7 +135,7 @@ impl<'a> fmt::Display for TokenKind<'a> {
             "{}",
             match self {
                 Literal(val) => val,
-                Whitespace(space) => space,
+                Whitespace(..) => "WHITESPACE",
                 Ampersand => "&",
                 Asterisk => "*",
                 Colon => ":",
@@ -174,7 +174,7 @@ impl<'a> Token<'a> {
     pub(crate) fn is_quote(&self) -> bool {
         match self.kind {
             TokenKind::DoubleQuote | TokenKind::SingleQuote => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -274,7 +274,7 @@ impl<'a> Tokenizer<'a> {
     fn consume_whitespace(&mut self, start: &SourceChar) -> Token<'a> {
         let SourceStr { slice, span } =
             self.consume_matches(start, |chr| chr == ' ' || chr == '\t');
-        Token::new(TokenKind::Whitespace(slice), span)
+        Token::new(TokenKind::Whitespace(slice.len()), span)
     }
 
     fn consume_literal(&mut self, start: &SourceChar) -> Token<'a> {
