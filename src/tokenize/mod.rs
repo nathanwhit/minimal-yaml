@@ -350,18 +350,9 @@ impl<'a> Tokenizer<'a> {
             match chr.value {
                 '&' => self.push_tok_with(Ampersand, chr.span()),
                 '*' => self.push_tok_with(Asterisk, chr.span()),
-                ':' => {
-                    self.push_tok_with(Colon, chr.span());
-                    self.chomp_whitespace(&chr);
-                }
-                ',' => {
-                    self.push_tok_with(Comma, chr.span());
-                    self.chomp_whitespace(&chr);
-                }
-                '-' => {
-                    self.push_tok_with(Dash, chr.span());
-                    self.chomp_whitespace(&chr);
-                }
+                ':' => self.push_tok_with(Colon, chr.span()),
+                ',' => self.push_tok_with(Comma, chr.span()),
+                '-' => self.push_tok_with(Dash, chr.span()),
                 '.' => self.push_tok_with(Dot, chr.span()),
                 '\"' => self.push_tok_with(DoubleQuote, chr.span()),
                 '>' => self.push_tok_with(Fold, chr.span()),
