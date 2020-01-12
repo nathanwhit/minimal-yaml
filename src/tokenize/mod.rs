@@ -165,8 +165,8 @@ impl<'a> Default for TokenKind<'a> {
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Token<'a> {
-    kind: TokenKind<'a>,
-    span: Span,
+    pub(crate) kind: TokenKind<'a>,
+    pub(crate) span: Span,
 }
 
 impl<'a> Default for Token<'a> {
