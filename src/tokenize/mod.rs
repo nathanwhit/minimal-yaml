@@ -190,6 +190,14 @@ impl<'a> Token<'a> {
             _ => false,
         }
     }
+
+    pub(crate) fn start(&self) -> ByteIdx {
+        self.span.start
+    }
+
+    pub(crate) fn end(&self) -> ByteIdx {
+        self.span.end
+    }
 }
 
 use core::str::CharIndices;
