@@ -1,6 +1,7 @@
 pub mod errors;
 mod parse;
 mod tokenize;
+mod tests;
 
 pub use crate::errors::MiniYamlError;
 
