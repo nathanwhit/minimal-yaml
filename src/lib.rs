@@ -6,6 +6,9 @@ pub use crate::errors::MiniYamlError;
 
 pub(crate) type Result<T> = std::result::Result<T, MiniYamlError>;
 
+use tokenize::Tokenizer;
+use parse::Parser;
+#[derive(Clone, Debug, PartialEq, Eq)]
 /// A Yaml Element
 pub enum Yaml<'a> {
     /// A literal value, losslessly interpreted as a string
@@ -31,7 +34,7 @@ pub enum Yaml<'a> {
     /// ```
     Mapping(Vec<Entry<'a>>),
 }
-
+#[derive(Clone, Debug, PartialEq, Eq)]
 /// A Yaml map entry
 pub struct Entry<'a> {
     /// The key associated with the entry
@@ -43,5 +46,8 @@ pub struct Entry<'a> {
 /// Parse Yaml input. Returns the top level Yaml element on success,
 /// or a ```MiniYamlError``` on failure
 pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
-    unimplemented!()
+    let tokenizer = Tokenizer::from_str(input);
+    let tokens = tokenizer.tokenize();
+    let mut parser = Parser::new(input, &tokens);
+    parser.parse()
 }
