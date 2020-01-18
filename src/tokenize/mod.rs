@@ -33,7 +33,7 @@ impl Span {
 impl ByteIdx {
     /// Returns a span from the current byte index
     /// to `other`.
-    fn to(self, other: ByteIdx) -> Span {
+    pub(crate) fn to(self, other: ByteIdx) -> Span {
         Span {
             start: self,
             end: other,
@@ -41,7 +41,7 @@ impl ByteIdx {
     }
     /// Returns a span that begins at the current byte index
     /// and has a length of `len`.
-    fn spans(self, len: ByteLen) -> Span {
+    pub(crate) fn spans(self, len: ByteLen) -> Span {
         Span {
             start: self,
             end: self + len,
