@@ -124,29 +124,31 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub(crate) fn parse_mapping_flow(&mut self) -> Result<Yaml<'a>> {
         use TokenKind::*;
-        match self.token.kind {
-            LeftBrace => {
-                self.bump();
-                let mut entries: Vec<Entry<'a>> = Vec::new();
-                loop {
-                    if let RightBrace = self.token.kind {
-                        self.bump();
-                        return Ok(Yaml::Mapping(entries));
-                    } else {
-                        let key = self.parse()?;
-                        self.bump();
-                        match self.token.kind {
-                            Colon => {
-                                self.bump();
-                                let value = self.parse()?;
-                                entries.push(Entry { key, value })
-                            }
-                            _ => return self.parse_error(),
+        self.bump();
+        let mut entries: Vec<Entry<'a>> = Vec::new();
+        loop {
+            match self.token.kind {
+                RightBrace => {
+                    self.bump();
+                    return Ok(Yaml::Mapping(entries));
+                }
+                Comma => {
+                    self.bump();
+                }
+                _ => {
+                    let key = self.parse()?;
+                    self.chomp_whitespace();
+                    match self.token.kind {
+                        Colon => {
+                            self.bump();
+                            let value = self.parse()?;
+                            self.chomp_whitespace();
+                            entries.push(Entry { key, value })
                         }
+                        _ => return self.parse_error(),
                     }
                 }
             }
-            _ => return self.parse_error(),
         }
     }
 
