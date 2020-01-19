@@ -186,7 +186,10 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let mut elements = Vec::new();
                 loop {
                     match self.token.kind {
-                        RightBracket => return Ok(Yaml::Sequence(elements)),
+                        RightBracket => {
+                            self.bump();
+                            return Ok(Yaml::Sequence(elements))
+                        },
                         Whitespace(..) => { self.bump(); },
                         _ => {
                             let elem = self.parse()?;
@@ -198,6 +201,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                                     continue;
                                 }
                                 RightBracket => {
+                                    self.bump();
                                     return Ok(Yaml::Sequence(elements));
                                 }
                                 _ => {
