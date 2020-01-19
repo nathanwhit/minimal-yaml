@@ -92,6 +92,8 @@ impl<'a, 'b> Parser<'a, 'b> {
                 self.bump();
                 let tok_range =
                     self.take_until(MatchOrErr, |tok, _| matches!(tok, DoubleQuote))?;
+                debug_assert!(matches!(self.token.kind, DoubleQuote));
+                self.bump();
                 let entire_literal = self.slice_tok_range(tok_range);
                 Ok(Yaml::Scalar(entire_literal))
             }
@@ -99,6 +101,8 @@ impl<'a, 'b> Parser<'a, 'b> {
                 self.bump();
                 let tok_range =
                     self.take_until(MatchOrErr, |tok, _| matches!(tok, SingleQuote))?;
+                debug_assert!(matches!(self.token.kind, SingleQuote));
+                self.bump();
                 let entire_literal = self.slice_tok_range(tok_range);
                 Ok(Yaml::Scalar(entire_literal))
             }
