@@ -63,10 +63,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         let res = match self.token.kind {
             DoubleQuote | SingleQuote | Literal(..) => {
                 let node = self.parse_scalar()?;
-                match self.token.kind {
-                    Colon => self.parse_mapping_block(node)?,
-                    _ => node,
-                }
+                node
             }
             LeftBrace => self.parse_mapping_flow()?,
             LeftBracket => self.parse_sequence_flow()?,
