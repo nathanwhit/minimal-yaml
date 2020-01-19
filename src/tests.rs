@@ -1,8 +1,8 @@
 #![cfg(test)]
 
 use crate::{
-    parse,
-    Yaml::{Scalar, Sequence},
+    parse, Entry,
+    Yaml::{Mapping, Scalar, Sequence},
 };
 
 macro_rules! mk_test {
@@ -100,4 +100,62 @@ mk_test!(
 mk_test!(
     mixed kind flow sequence quotes;
     r#"[" elem " , [ a, 'b ' , "   c "]]"# => seq!(S(" elem "); seq!("a", "b ", "   c "))
+);
+
+// Macro
+
+macro_rules! map {
+    { $($key : tt : $val : tt),* } => {
+        Mapping(vec![$(Entry { key: Scalar($key) , value: Scalar($val) }),*])
+    };
+    { $($key : expr => $val : expr);* } => {
+        Mapping(vec![$(Entry { key: $key , value: $val }),*])
+    }
+}
+
+// Flow mappings
+
+mk_test!(
+    simple flow mapping;
+    r"{ k : v }" => map!{ "k" : "v" }
+);
+
+mk_test!(
+    multiple entry flow mapping;
+    r"{ k1 : v1 ,   k2 :     v2    }" => map!{ "k1" : "v1", "k2":"v2" }
+);
+
+mk_test!(
+    seq value flow mapping;
+    r"{ k1 : [ a , b, c] }" => map! {
+        S("k1") => seq!("a", "b", "c")
+    }
+);
+
+mk_test!(
+    seq key flow mapping;
+    r"{ [ a, map, as a key ] : val }" => map! {
+        seq!("a", "map", "as a key") => S("val")
+    }
+);
+
+mk_test!(
+    seq entry flow mapping;
+    r"{ [ a, seq, as a key ] : [  a, seq, as a value ]  }" => map! {
+        seq!("a", "seq", "as a key") => seq!("a", "seq", "as a value")
+    }
+);
+
+mk_test!(
+    map key flow mapping;
+    r"{ { a map : as a key} : value }" => map! {
+        map! { "a map" : "as a key" } => S("value")
+    }
+);
+
+mk_test!(
+    map entry flow mapping;
+    r"{ { a   map : as a key} : { 'a map ': as a value }   }" => map! {
+        map! { "a   map" : "as a key" } => map! { "a map " : "as a value" } 
+    }
 );
