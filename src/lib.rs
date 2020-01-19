@@ -1,14 +1,14 @@
 pub mod errors;
 mod parse;
-mod tokenize;
 mod tests;
+mod tokenize;
 
 pub use crate::errors::MiniYamlError;
 
 pub(crate) type Result<T> = std::result::Result<T, MiniYamlError>;
 
-use tokenize::Tokenizer;
 use parse::Parser;
+use tokenize::Tokenizer;
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// A Yaml Element
 pub enum Yaml<'a> {

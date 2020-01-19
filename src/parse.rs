@@ -1,12 +1,11 @@
 #![allow(unused)]
 use crate::tokenize::{Span, Token, TokenKind};
-use crate::{Entry, Yaml, MiniYamlError};
-use core::iter::{Iterator, Peekable, Enumerate};
+use crate::{Entry, MiniYamlError, Yaml};
+use core::iter::{Enumerate, Iterator, Peekable};
 use core::mem;
 use core::slice::Iter;
 
 use crate::Result;
-
 
 // Implementation lifted from std, as it's currently only on Nightly. It's such a simple macro that it's low risk to duplicate it here (and better than writing one myself)
 macro_rules! matches {
@@ -25,7 +24,7 @@ pub(crate) struct Parser<'a, 'b> {
     tok_stream: &'b [Token<'a>],
     source: &'a str,
     tok_idx: usize,
-    indent: usize
+    indent: usize,
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
@@ -39,7 +38,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             tok_stream,
             source,
             tok_idx: first.0,
-            indent: 0
+            indent: 0,
         }
     }
 
@@ -66,9 +65,9 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let node = self.parse_scalar()?;
                 match self.token.kind {
                     Colon => self.parse_mapping_block(node)?,
-                    _ => node
+                    _ => node,
                 }
-            },
+            }
             LeftBrace => self.parse_mapping_flow()?,
             LeftBracket => self.parse_sequence_flow()?,
             Dash => self.parse_sequence_block()?,
@@ -78,35 +77,42 @@ impl<'a, 'b> Parser<'a, 'b> {
                 self.bump();
                 self.parse()?
             }
-            _ => return self.parse_error()
+            _ => return self.parse_error(),
         };
         Ok(res)
     }
 
     pub(crate) fn parse_scalar(&mut self) -> Result<Yaml<'a>> {
-        use TokenKind::*;
         use TakeUntilCond::*;
+        use TokenKind::*;
         match self.token.kind {
             // TODO: currently qouble quote/single quote scalars are handled identically. maybe handle as defined
             // by the YAML spec?
             DoubleQuote => {
                 self.bump();
-                let tok_range = self.take_until(MatchOrErr, |tok| matches!(tok.kind, DoubleQuote))?;
+                let tok_range =
+                    self.take_until(MatchOrErr, |tok| matches!(tok.kind, DoubleQuote))?;
                 let entire_literal = self.slice_tok_range(tok_range);
                 Ok(Yaml::Scalar(entire_literal))
             }
             SingleQuote => {
                 self.bump();
-                let tok_range = self.take_until(MatchOrErr, |tok| matches!(tok.kind, SingleQuote))?;
+                let tok_range =
+                    self.take_until(MatchOrErr, |tok| matches!(tok.kind, SingleQuote))?;
                 let entire_literal = self.slice_tok_range(tok_range);
                 Ok(Yaml::Scalar(entire_literal))
             }
             Literal(value) => {
-                let tok_range = self.take_until(MatchOrEnd, |tok| matches!(tok.kind, Comma | Colon | RightBrace | RightBracket | Newline))?;
+                let tok_range = self.take_until(MatchOrEnd, |tok| {
+                    matches!(
+                        tok.kind,
+                        Comma | Colon | RightBrace | RightBracket | Newline
+                    )
+                })?;
                 let entire_literal = self.slice_tok_range(tok_range);
                 Ok(Yaml::Scalar(entire_literal))
-            },
-            _ => self.parse_error()
+            }
+            _ => self.parse_error(),
         }
     }
 
@@ -133,20 +139,20 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 let value = self.parse()?;
                                 entries.push(Entry { key, value })
                             }
-                            _ => return self.parse_error()
+                            _ => return self.parse_error(),
                         }
                     }
-                } 
+                }
             }
-            _ => return self.parse_error()
-        } 
+            _ => return self.parse_error(),
+        }
     }
 
     pub(crate) fn parse_mapping_block(&mut self, start_key: Yaml<'a>) -> Result<Yaml<'a>> {
         use TokenKind::*;
         match self.token.kind {
-            _ => ()
-        } 
+            _ => (),
+        }
         todo!()
     }
 
@@ -154,7 +160,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         let start = self.tok_stream[range.0].start();
         let end = match self.tok_stream.get(range.1) {
             Some(tok) => tok.start(),
-            None => self.tok_stream.last().unwrap().end()
+            None => self.tok_stream.last().unwrap().end(),
         };
         &self.source[start.into()..end.into()]
     }
@@ -167,7 +173,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let mut elements = Vec::new();
                 loop {
                     if let RightBracket = self.token.kind {
-                        return Ok(Yaml::Sequence(elements))
+                        return Ok(Yaml::Sequence(elements));
                     } else {
                         let elem = self.parse()?;
                         elements.push(elem);
@@ -179,13 +185,12 @@ impl<'a, 'b> Parser<'a, 'b> {
                             RightBracket => {
                                 return Ok(Yaml::Sequence(elements));
                             }
-                            _ => return Err(MiniYamlError::ParseError)
-
+                            _ => return Err(MiniYamlError::ParseError),
                         }
                     }
                 }
             }
-            _ => self.parse_error()
+            _ => self.parse_error(),
         }
     }
 
@@ -196,13 +201,17 @@ impl<'a, 'b> Parser<'a, 'b> {
                 self.bump();
                 todo!()
             }
-            _ => self.parse_error()
+            _ => self.parse_error(),
         }
     }
 
-    fn take_until(&mut self, cond: TakeUntilCond, stop: impl Fn(&Token<'a>) -> bool) -> Result<(usize, usize)> {
+    fn take_until(
+        &mut self,
+        cond: TakeUntilCond,
+        stop: impl Fn(&Token<'a>) -> bool,
+    ) -> Result<(usize, usize)> {
         let start = self.tok_idx;
-        let mut end = start; 
+        let mut end = start;
         loop {
             if stop(&self.token) {
                 break;
@@ -210,7 +219,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 return match cond {
                     TakeUntilCond::MatchOrEnd => Ok((start, self.tok_stream.len())),
                     TakeUntilCond::MatchOrErr => self.parse_error(),
-                }
+                };
             }
             end += 1;
         }
@@ -220,5 +229,5 @@ impl<'a, 'b> Parser<'a, 'b> {
 
 enum TakeUntilCond {
     MatchOrEnd,
-    MatchOrErr
+    MatchOrErr,
 }
