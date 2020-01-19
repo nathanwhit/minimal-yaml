@@ -1,42 +1,46 @@
-#[cfg(test)]
-use crate::{parse, Result, Yaml::{Scalar}};
+#![cfg(test)]
 
-#[test]
-fn test_parse_double_quote_scalar_w_ws() {
-    const INPUT: &str = r#""a scalar value with whitespace""#;
-    let res = parse(INPUT).unwrap();
-    assert_eq!(res, Scalar("a scalar value with whitespace"))
+use crate::{parse, Result, Yaml::Scalar};
+
+macro_rules! mk_test {
+    ($($name: ident) +; $inp: expr => $exp: expr) => {
+        paste::item! {
+            #[test]
+            fn [<test_parse_$($name _)+>] () -> Result<()> {
+                const INPUT: &str = $inp;
+                assert_eq!(parse(INPUT)?, $exp);
+                Ok(())
+            }
+        }
+    }
 }
 
+mk_test!(
+    double quote scalar whitespace;
+    r#""a scalar value with whitespace""# => Scalar("a scalar value with whitespace")
+);
 
-#[test]
-fn test_parse_double_quote_scalar_wo_ws() -> Result<()> {
-    const INPUT: &str = r#""a_scalarvaluewithout_whitespace""#;
-    assert_eq!(parse(INPUT).unwrap(), Scalar("a_scalarvaluewithout_whitespace"));
-    Ok(())
-}
+mk_test!(
+    double quote scalar no whitespace;
+    r#""a_scalarvaluewithout_whitespace""# => Scalar("a_scalarvaluewithout_whitespace")
+);
 
-#[test]
-fn test_parse_single_quote_scalar_w_ws() {
-    const INPUT: &str = r#"'a scalar value with whitespace'"#;
-    assert_eq!(parse(INPUT).unwrap(), Scalar("a scalar value with whitespace"))
-}
+mk_test!(
+    single quote scalar whitespace;
+    r#"'a scalar value with whitespace'"# => Scalar("a scalar value with whitespace")
+);
 
-#[test]
-fn test_parse_single_quote_scalar_wo_ws() {
-    const INPUT: &str = r#"'ascalarvalue_without_whitespace'"#;
-    assert_eq!(parse(INPUT).unwrap(), Scalar("ascalarvalue_without_whitespace"))
+mk_test!(
+    single quote scalar no whitespace;
+    r#"'ascalarvalue_without_whitespace'"# => Scalar("ascalarvalue_without_whitespace")
+);
 
-}
+mk_test!(
+    no quote scalar whitespace;
+    "an unquoted scalar value with whitespace" => Scalar("an unquoted scalar value with whitespace")
+);
 
-#[test]
-fn test_parse_no_quote_scalar_w_ws() {
-    const INPUT: &str = r#"an unquoted scalar value with whitespace"#;
-    assert_eq!(parse(INPUT).unwrap(), Scalar("an unquoted scalar value with whitespace"))
-}
-
-#[test]
-fn test_parse_no_quote_scalar_wo_ws() {
-    const INPUT: &str = r#"anunquoted_scalar_value_withoutwhitespace"#;
-    assert_eq!(parse(INPUT).unwrap(), Scalar("anunquoted_scalar_value_withoutwhitespace"))
-}
+mk_test!(
+    no quote scalar no whitespace;
+    "anunquoted_scalar_value_withoutwhitespace" => Scalar("anunquoted_scalar_value_withoutwhitespace")
+);

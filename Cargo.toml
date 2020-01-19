@@ -5,3 +5,6 @@ authors = ["nathanwhit <nathan.whitaker01@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+
+[dev-dependencies]
+paste = "0.1.6"
