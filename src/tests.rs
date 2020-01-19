@@ -1,18 +1,18 @@
 #![cfg(test)]
 
-use crate::{parse, Result, Yaml::Scalar};
+use crate::{parse, Yaml::{Scalar, Sequence}};
 
 macro_rules! mk_test {
     ($($name: ident) +; $inp: expr => $exp: expr) => {
         paste::item! {
             #[test]
-            fn [<test_parse_$($name _)+>] () -> Result<()> {
+            fn [<test_parse_$($name _)+>] () {
                 const INPUT: &str = $inp;
-                assert_eq!(parse(INPUT)?, $exp);
-                Ok(())
+                assert_eq!(parse(INPUT).unwrap(), $exp);
             }
         }
-    }
+    };
+}
 }
 
 mk_test!(
