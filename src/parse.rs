@@ -107,7 +107,6 @@ impl<'a, 'b> Parser<'a, 'b> {
                 Ok(Yaml::Scalar(entire_literal))
             }
             Literal(value) => {
-                println!("value = {}", value);
                 let stop = |tok: &TokenKind<'_>| {
                     matches!(
                         tok,
@@ -117,10 +116,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let tok_range = self.take_until(MatchOrEnd, |tok, nxt| {
                     stop(tok) || (matches!(tok, Whitespace(..)) && stop(nxt))
                 })?;
-                println!("here with tok_range = {:?}", tok_range);
                 let entire_literal = self.slice_tok_range(tok_range);
-                println!("sliced : {}", entire_literal);
-                println!("current token = {:?}", self.token);
                 Ok(Yaml::Scalar(entire_literal))
             }
             _ => self.parse_error(),
@@ -204,7 +200,9 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 RightBracket => {
                                     return Ok(Yaml::Sequence(elements));
                                 }
-                                _ => return Err(MiniYamlError::ParseError),
+                                _ => {
+                                    return Err(MiniYamlError::ParseError)
+                                },
                             }
                         }
                     }
@@ -239,7 +237,6 @@ impl<'a, 'b> Parser<'a, 'b> {
                 return match cond {
                     TakeUntilCond::MatchOrEnd => Ok((start, self.tok_stream.len())),
                     TakeUntilCond::MatchOrErr => {
-                        eprintln!("Reached end");
                         self.parse_error()
                     },
                 };
