@@ -90,8 +90,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             // by the YAML spec?
             DoubleQuote => {
                 self.bump();
-                let tok_range =
-                    self.take_until(MatchOrErr, |tok, _| matches!(tok, DoubleQuote))?;
+                let tok_range = self.take_until(MatchOrErr, |tok, _| matches!(tok, DoubleQuote))?;
                 debug_assert!(matches!(self.token.kind, DoubleQuote));
                 self.bump();
                 let entire_literal = self.slice_tok_range(tok_range);
@@ -99,8 +98,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             }
             SingleQuote => {
                 self.bump();
-                let tok_range =
-                    self.take_until(MatchOrErr, |tok, _| matches!(tok, SingleQuote))?;
+                let tok_range = self.take_until(MatchOrErr, |tok, _| matches!(tok, SingleQuote))?;
                 debug_assert!(matches!(self.token.kind, SingleQuote));
                 self.bump();
                 let entire_literal = self.slice_tok_range(tok_range);
@@ -108,10 +106,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             }
             Literal(value) => {
                 let stop = |tok: &TokenKind<'_>| {
-                    matches!(
-                        tok,
-                        Comma | Colon | RightBrace | RightBracket | Newline
-                    )
+                    matches!(tok, Comma | Colon | RightBrace | RightBracket | Newline)
                 };
                 let tok_range = self.take_until(MatchOrEnd, |tok, nxt| {
                     stop(tok) || (matches!(tok, Whitespace(..)) && stop(nxt))
@@ -188,9 +183,11 @@ impl<'a, 'b> Parser<'a, 'b> {
                     match self.token.kind {
                         RightBracket => {
                             self.bump();
-                            return Ok(Yaml::Sequence(elements))
-                        },
-                        Whitespace(..) => { self.bump(); },
+                            return Ok(Yaml::Sequence(elements));
+                        }
+                        Whitespace(..) => {
+                            self.bump();
+                        }
                         _ => {
                             let elem = self.parse()?;
                             elements.push(elem);
@@ -204,9 +201,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                                     self.bump();
                                     return Ok(Yaml::Sequence(elements));
                                 }
-                                _ => {
-                                    return Err(MiniYamlError::ParseError)
-                                },
+                                _ => return Err(MiniYamlError::ParseError),
                             }
                         }
                     }
@@ -235,14 +230,15 @@ impl<'a, 'b> Parser<'a, 'b> {
         let start = self.tok_idx;
         let mut end = start;
         loop {
-            if stop(&self.token.kind, &self.peek().unwrap_or_else(|| Token::default()).kind) {
+            if stop(
+                &self.token.kind,
+                &self.peek().unwrap_or_else(|| Token::default()).kind,
+            ) {
                 break;
             } else if !self.bump() {
                 return match cond {
                     TakeUntilCond::MatchOrEnd => Ok((start, self.tok_stream.len())),
-                    TakeUntilCond::MatchOrErr => {
-                        self.parse_error()
-                    },
+                    TakeUntilCond::MatchOrErr => self.parse_error(),
                 };
             }
             end += 1;

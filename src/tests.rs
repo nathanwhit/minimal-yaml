@@ -1,6 +1,9 @@
 #![cfg(test)]
 
-use crate::{parse, Yaml::{Scalar, Sequence}};
+use crate::{
+    parse,
+    Yaml::{Scalar, Sequence},
+};
 
 macro_rules! mk_test {
     ($($name: ident) +; $inp: expr => $exp: expr) => {
