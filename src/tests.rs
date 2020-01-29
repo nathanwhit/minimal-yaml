@@ -97,12 +97,12 @@ mk_test!(
 
 mk_test!(
     mixed kind flow sequence no quotes;
-    r"[[ a, b, c], el]" => seq!(seq!("a", "b", "c"), S("el"))
+    r"[[ a, b, c], el]" => seq!(seq!("a", "b", "c"), "el")
 );
 
 mk_test!(
     mixed kind flow sequence quotes;
-    r#"[" elem " , [ a, 'b ' , "   c "]]"# => seq!(" elem", seq!("a", "b ", "   c "))
+    r#"[" elem " , [ a, 'b ' , "   c "]]"# => seq!(" elem ", seq!("a", "b ", "   c "))
 );
 
 // Macro
@@ -213,4 +213,58 @@ r#"
   - two
   - "'e l e m e n t s'"
 "# => seq!(seq!(" a ", " nested", " \" block  \" ","sequence"), seq!("with", "two", "\'e l e m e n t s\'"))
+);
+
+mk_test!(
+block sequence multiple nested;
+r##"
+-
+    - "a"
+    - "nested"
+    - block
+    -
+        - sequence
+        - with
+    - lots
+    -
+        - of
+        - different
+-   
+    - indent
+    - levels
+    -
+        - [with, a, flow, sequence for good measure]
+- "' the '"
+- end
+"## => 
+    seq!(
+        seq!(
+            "a",
+            "nested",
+            "block",
+            seq!(
+                "sequence",
+                "with"
+            ),
+            "lots",
+            seq!(
+                "of",
+                "different"
+            )
+        ),
+        seq!(
+            "indent",
+            "levels",
+            seq!(
+                seq!(
+                    "with",
+                    "a",
+                    "flow",
+                    "sequence for good measure"
+                )
+            )
+        ),
+        "\' the \'",
+        "end"
+    )
 );
