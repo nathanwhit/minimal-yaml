@@ -2,8 +2,15 @@
 
 use crate::{
     parse, Entry,
+    Yaml,
     Yaml::{Mapping, Scalar, Sequence},
 };
+
+impl<'a> From<&'a str> for Yaml<'a> {
+    fn from(other: &'a str) -> Self {
+        Yaml::Scalar(other)
+    }
+}
 
 macro_rules! mk_test {
     ($($name: ident) +; $inp: expr => $exp: expr) => {
@@ -53,11 +60,7 @@ use Scalar as S;
 
 macro_rules! seq {
     ($($val: expr),*) => {
-        Sequence(vec![$( Scalar($val )),*])
-    };
-
-    ($($val: expr);*) => {
-        Sequence(vec![$( $val ),*])
+        Sequence(vec![$( $val.into() ),*])
     }
 }
 
@@ -87,19 +90,19 @@ mk_test!(
     multiple flow sequence no quotes;
     r"[[ a, b, c ,d, e   ] , [ f, g, h, i , j ]]" => 
         seq!(
-            seq!("a", "b","c", "d", "e");
+            seq!("a", "b","c", "d", "e"),
             seq!("f", "g", "h", "i", "j")
         )
 );
 
 mk_test!(
     mixed kind flow sequence no quotes;
-    r"[[ a, b, c], el]" => seq!(seq!("a", "b", "c"); S("el"))
+    r"[[ a, b, c], el]" => seq!(seq!("a", "b", "c"), S("el"))
 );
 
 mk_test!(
     mixed kind flow sequence quotes;
-    r#"[" elem " , [ a, 'b ' , "   c "]]"# => seq!(S(" elem "); seq!("a", "b ", "   c "))
+    r#"[" elem " , [ a, 'b ' , "   c "]]"# => seq!(" elem", seq!("a", "b ", "   c "))
 );
 
 // Macro
@@ -182,7 +185,7 @@ r#"
 - sequence
 - with
 -       [ a, sequence, "as ", 'a', node  ]
-"# => seq!(Scalar("a"); Scalar("sequence"); Scalar("with"); seq!("a", "sequence", "as ", "a", "node"))
+"# => seq!("a", "sequence", "with", seq!("a", "sequence", "as ", "a", "node"))
 );
 
 
@@ -194,7 +197,7 @@ r#"
 - sequence
 - '  "with" '
 - { a : "flow", mapping : ' as ', a : " 'node' "}
-"# => seq!(S("a"); S("block"); S("sequence"); S("  \"with\" "); map!{ "a" : "flow", "mapping" : " as ", "a" : " \'node\' "})
+"# => seq!("a", "block", "sequence", "  \"with\" ", map!{ "a" : "flow", "mapping" : " as ", "a" : " \'node\' "})
 );
 
 mk_test!(
@@ -209,5 +212,5 @@ r#"
   - with
   - two
   - "'e l e m e n t s'"
-"# => seq!(seq!(" a ", " nested", " \" block  \" ","sequence"); seq!("with", "two", "\'e l e m e n t s\'"))
+"# => seq!(seq!(" a ", " nested", " \" block  \" ","sequence"), seq!("with", "two", "\'e l e m e n t s\'"))
 );
