@@ -62,7 +62,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         use TokenKind::*;
         let res = match self.token.kind {
             DoubleQuote | SingleQuote | Literal(..) => {
-                if self.lookahead1(|t| matches!(t, Colon)) {
+                if self.check_ahead_1(|t| matches!(t, Colon)) {
                     let key = self.parse_scalar()?;
                     self.parse_mapping_block(key)?
                 } else {
@@ -79,6 +79,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 self.parse()?
             }
             Newline => {
+                self.indent = 0;
                 self.bump();
                 self.parse()?
             }
@@ -218,7 +219,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    fn lookahead1(
+    fn check_ahead_1(
         &mut self,
         stop: impl Fn(&TokenKind<'a>) -> bool,
     ) -> bool {
@@ -234,10 +235,12 @@ impl<'a, 'b> Parser<'a, 'b> {
         match self.token.kind {
             Dash => {
                 let mut seq = Vec::new();
-                let mut curr_indent = indent;
                 loop {
+                    println!("{:?}", self.token.kind);
+                    println!("indent = {}", self.indent);
                     match self.token.kind {
                         Newline => {
+                            self.indent = 0;
                             if self.bump() {
                                 continue;
                             } else {
@@ -246,15 +249,32 @@ impl<'a, 'b> Parser<'a, 'b> {
                         }
                         Whitespace(idt) => {
                             self.bump();
-                            curr_indent = idt;
+                            self.indent = idt;
                         }
+                        _ if self.indent < indent => break,
                         Dash => {
-                            if curr_indent != indent {
-                                break;
+                            if self.check_ahead_1(|t| matches!(t, Newline)) {
+                                self.bump();
+                                self.bump();
+                                self.indent = 0;
+                                if let Whitespace(idt) = self.token.kind {
+                                    if idt < indent {
+                                        break;
+                                    } else {
+                                        let node = self.parse()?;
+                                        seq.push(node);
+                                    }
+                                } else if 0 < indent {
+                                    break;
+                                } else {
+                                    let node = self.parse()?;
+                                    seq.push(node);
+                                }
+                            } else {
+                                self.bump();
+                                let node = self.parse()?;
+                                seq.push(node);
                             }
-                            self.bump();
-                            let node = self.parse()?;
-                            seq.push(node);
                         }
                         _ => break,
                     }
@@ -262,6 +282,27 @@ impl<'a, 'b> Parser<'a, 'b> {
                 Ok(Yaml::Sequence(seq))
             }
             _ => self.parse_error(),
+        }
+    }
+
+    fn check_ahead_n(
+        &self,
+        n: usize,
+        stop: impl Fn(&TokenKind<'a>) -> bool,
+    ) -> bool {
+        match self.tok_stream.get(self.tok_idx+n) {
+            Some(Token { kind: tok_kind, .. }) => stop(tok_kind),
+            None => false
+        }
+    }
+
+    fn peekahead_n(
+        &self,
+        n: usize
+    ) -> Option<&TokenKind<'a>> {
+        match self.tok_stream.get(self.tok_idx+n) {
+            Some(Token { kind: tok_kind, ..}) => Some(tok_kind),
+            None => None
         }
     }
 

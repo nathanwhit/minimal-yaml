@@ -176,11 +176,38 @@ r#"
 );
 
 mk_test!(
-block sequence flow mapping;
+block sequence flow seq;
 r#"
 - a
 - sequence
 - with
 -       [ a, sequence, "as ", 'a', node  ]
 "# => seq!(Scalar("a"); Scalar("sequence"); Scalar("with"); seq!("a", "sequence", "as ", "a", "node"))
+);
+
+
+mk_test!(
+block sequence flow map;
+r#"
+- a
+- block
+- sequence
+- '  "with" '
+- { a : "flow", mapping : ' as ', a : " 'node' "}
+"# => seq!(S("a"); S("block"); S("sequence"); S("  \"with\" "); map!{ "a" : "flow", "mapping" : " as ", "a" : " \'node\' "})
+);
+
+mk_test!(
+block sequence nested;
+r#"
+-
+  - " a "
+  - ' nested'
+  - ' " block  " '
+  - sequence
+-
+  - with
+  - two
+  - "'e l e m e n t s'"
+"# => seq!(seq!(" a ", " nested", " \" block  \" ","sequence"); seq!("with", "two", "\'e l e m e n t s\'"))
 );
