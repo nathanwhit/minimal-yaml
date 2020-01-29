@@ -219,13 +219,10 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    fn check_ahead_1(
-        &mut self,
-        stop: impl Fn(&TokenKind<'a>) -> bool,
-    ) -> bool {
+    fn check_ahead_1(&mut self, stop: impl Fn(&TokenKind<'a>) -> bool) -> bool {
         match self.peek() {
             Some(tok) => stop(&tok.kind),
-            None => false
+            None => false,
         }
     }
 
@@ -285,24 +282,17 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    fn check_ahead_n(
-        &self,
-        n: usize,
-        stop: impl Fn(&TokenKind<'a>) -> bool,
-    ) -> bool {
-        match self.tok_stream.get(self.tok_idx+n) {
+    fn check_ahead_n(&self, n: usize, stop: impl Fn(&TokenKind<'a>) -> bool) -> bool {
+        match self.tok_stream.get(self.tok_idx + n) {
             Some(Token { kind: tok_kind, .. }) => stop(tok_kind),
-            None => false
+            None => false,
         }
     }
 
-    fn peekahead_n(
-        &self,
-        n: usize
-    ) -> Option<&TokenKind<'a>> {
-        match self.tok_stream.get(self.tok_idx+n) {
-            Some(Token { kind: tok_kind, ..}) => Some(tok_kind),
-            None => None
+    fn peekahead_n(&self, n: usize) -> Option<&TokenKind<'a>> {
+        match self.tok_stream.get(self.tok_idx + n) {
+            Some(Token { kind: tok_kind, .. }) => Some(tok_kind),
+            None => None,
         }
     }
 
