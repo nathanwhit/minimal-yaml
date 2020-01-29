@@ -62,8 +62,12 @@ impl<'a, 'b> Parser<'a, 'b> {
         use TokenKind::*;
         let res = match self.token.kind {
             DoubleQuote | SingleQuote | Literal(..) => {
-                let node = self.parse_scalar()?;
-                node
+                if self.lookahead1(|t| matches!(t, Colon)) {
+                    let key = self.parse_scalar()?;
+                    self.parse_mapping_block(key)?
+                } else {
+                    self.parse_scalar()?
+                }
             }
             LeftBrace => self.parse_mapping_flow()?,
             LeftBracket => self.parse_sequence_flow()?,
@@ -71,6 +75,10 @@ impl<'a, 'b> Parser<'a, 'b> {
             RightBrace | RightBracket => return Err(MiniYamlError::ParseError),
             Whitespace(amt) => {
                 self.indent = amt;
+                self.bump();
+                self.parse()?
+            }
+            Newline => {
                 self.bump();
                 self.parse()?
             }
@@ -210,12 +218,48 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
+    fn lookahead1(
+        &mut self,
+        stop: impl Fn(&TokenKind<'a>) -> bool,
+    ) -> bool {
+        match self.peek() {
+            Some(tok) => stop(&tok.kind),
+            None => false
+        }
+    }
+
     pub(crate) fn parse_sequence_block(&mut self) -> Result<Yaml<'a>> {
         use TokenKind::*;
+        let indent = self.indent;
         match self.token.kind {
             Dash => {
-                self.bump();
-                todo!()
+                let mut seq = Vec::new();
+                let mut curr_indent = indent;
+                loop {
+                    match self.token.kind {
+                        Newline => {
+                            if self.bump() {
+                                continue;
+                            } else {
+                                break;
+                            }
+                        }
+                        Whitespace(idt) => {
+                            self.bump();
+                            curr_indent = idt;
+                        }
+                        Dash => {
+                            if curr_indent != indent {
+                                break;
+                            }
+                            self.bump();
+                            let node = self.parse()?;
+                            seq.push(node);
+                        }
+                        _ => break,
+                    }
+                }
+                Ok(Yaml::Sequence(seq))
             }
             _ => self.parse_error(),
         }

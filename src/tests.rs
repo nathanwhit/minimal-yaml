@@ -159,3 +159,28 @@ mk_test!(
         map! { "a   map" : "as a key" } => map! { "a map " : "as a value" } 
     }
 );
+
+// Block Sequence
+
+mk_test!(
+simple block sequence;
+r#"
+- a
+- sequence
+- of
+-yaml
+-   nodes
+- "in"
+- 'block'
+- ' form '"# => seq!("a", "sequence", "of", "yaml", "nodes", "in", "block", " form ") 
+);
+
+mk_test!(
+block sequence flow mapping;
+r#"
+- a
+- sequence
+- with
+-       [ a, sequence, "as ", 'a', node  ]
+"# => seq!(Scalar("a"); Scalar("sequence"); Scalar("with"); seq!("a", "sequence", "as ", "a", "node"))
+);
