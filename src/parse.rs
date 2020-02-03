@@ -302,10 +302,10 @@ impl<'a, 'b> Parser<'a, 'b> {
         let mut end = start;
         loop {
             let peeked = self.peekahead_n(1);
-            if peeked.is_some() && stop(
-                &self.token.kind,
-                &peeked.unwrap(),
-            ) {
+            if match peeked {
+                Some(tok_kind) => stop(&self.token.kind, tok_kind),
+                None => stop(&self.token.kind, &TokenKind::default())
+            } {
                 break;
             } else if !self.bump() {
                 return match cond {
