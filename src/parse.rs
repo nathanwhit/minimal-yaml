@@ -19,7 +19,6 @@ macro_rules! matches {
 
 pub(crate) struct Parser<'a, 'b> {
     token: &'b Token<'a>,
-    prev_kind: TokenKind<'a>,
     stream: Peekable<Enumerate<Iter<'b, Token<'a>>>>,
     tok_stream: &'b [Token<'a>],
     source: &'a str,
@@ -34,7 +33,6 @@ impl<'a, 'b> Parser<'a, 'b> {
         Self {
             token: &first.1,
             stream,
-            prev_kind: TokenKind::Dummy,
             tok_stream,
             source,
             tok_idx: first.0,
@@ -43,7 +41,6 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn bump(&mut self) -> bool {
-        self.prev_kind = self.token.kind.clone();
         match self.stream.next() {
             Some(tok) => {
                 self.tok_idx = tok.0;
@@ -54,8 +51,8 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    fn peek(&mut self) -> Option<Token<'a>> {
-        self.stream.peek().map(|&t| t.1.clone())
+    fn peek(&mut self) -> Option<&Token<'a>> {
+        self.stream.peek().map(|t| t.1)
     }
 
     pub(crate) fn parse(&mut self) -> Result<Yaml<'a>> {
@@ -304,9 +301,10 @@ impl<'a, 'b> Parser<'a, 'b> {
         let start = self.tok_idx;
         let mut end = start;
         loop {
-            if stop(
+            let peeked = self.peekahead_n(1);
+            if peeked.is_some() && stop(
                 &self.token.kind,
-                &self.peek().unwrap_or_else(|| Token::default()).kind,
+                &peeked.unwrap(),
             ) {
                 break;
             } else if !self.bump() {
