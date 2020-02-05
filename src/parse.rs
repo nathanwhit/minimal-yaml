@@ -24,6 +24,7 @@ pub(crate) struct Parser<'a, 'b> {
     source: &'a str,
     tok_idx: usize,
     indent: usize,
+    expected: Vec<TokenKind<'a>>
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
@@ -37,6 +38,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             source,
             tok_idx: first.0,
             indent: 0,
+            expected: Vec::new(),
         }
     }
 
@@ -59,14 +61,22 @@ impl<'a, 'b> Parser<'a, 'b> {
         use TokenKind::*;
         let res = match self.token.kind {
             DoubleQuote | SingleQuote | Literal(..) => {
-                if self.check_ahead_1(|t| matches!(t, Colon)) {
-                    let key = self.parse_scalar()?;
-                    self.parse_mapping_block(key)?
-                } else {
-                    self.parse_scalar()?
+                let node = self.parse_scalar()?;
+                self.chomp_whitespace();
+                match self.token.kind {
+                    Colon if match self.expected.last() { Some(RightBrace) | Some(Colon) => false, _ => true } => self.parse_mapping_block(node)?,
+                    _ => node
                 }
             }
-            LeftBrace => self.parse_mapping_flow()?,
+            LeftBrace => {
+                self.expected.push(RightBrace);
+                let res = self.parse_mapping_flow()?;
+                match self.expected.last() {
+                    Some(RightBrace) => { self.pop_if_match(RightBrace); },
+                    _ => ()
+                }
+                res
+            },
             LeftBracket => self.parse_sequence_flow()?,
             Dash => self.parse_sequence_block()?,
             RightBrace | RightBracket => return Err(MiniYamlError::ParseError),
@@ -139,11 +149,14 @@ impl<'a, 'b> Parser<'a, 'b> {
                     self.bump();
                 }
                 _ => {
+                    self.expected.push(Colon);
                     let key = self.parse()?;
                     self.chomp_whitespace();
                     match self.token.kind {
                         Colon => {
+                            self.pop_if_match(Colon)?;
                             self.bump();
+                            self.chomp_whitespace();
                             let value = self.parse()?;
                             self.chomp_whitespace();
                             entries.push(Entry { key, value })
@@ -157,10 +170,57 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub(crate) fn parse_mapping_block(&mut self, start_key: Yaml<'a>) -> Result<Yaml<'a>> {
         use TokenKind::*;
+        let indent = self.indent;
         match self.token.kind {
-            _ => (),
+            Colon => {
+                self.bump();
+                let mut entries = Vec::new();
+                // let value = match self.token.kind {
+                //     Newline if match self.peekahead_n(1) {
+                //         Some(&Whitespace(amt)) if amt > indent => true,
+                //         _ => false
+                //     } => self.parse(),
+                // }
+                // let value
+                self.chomp_whitespace();
+                let value = self.parse()?;
+                entries.push(Entry::new(start_key, value));
+                loop {
+                    match self.token.kind {
+                        Newline => {
+                            self.indent = 0;
+                            if self.bump() {
+                                continue;
+                            } else {
+                                break;
+                            }
+                        }
+                        Whitespace(idt) => {
+                            self.bump();
+                            self.indent = idt;
+                        }
+                        _ if self.indent < indent => break,
+                        _ => {
+                            self.expected.push(Colon);
+                            let key = self.parse()?;
+                            self.chomp_whitespace();
+                            if let Colon = self.token.kind  {
+                                self.pop_if_match(Colon)?;
+                                self.bump();
+                                self.chomp_whitespace();
+                                let value = self.parse()?;
+                                entries.push(Entry::new(key, value));
+                            } else {
+                                return self.parse_error();
+                            }
+                        }
+                        _ => return self.parse_error()
+                    }
+                }
+                Ok(Yaml::Mapping(entries))
+            }
+            _ => self.parse_error(),
         }
-        todo!()
     }
 
     fn slice_tok_range(&self, range: (usize, usize)) -> &'a str {
@@ -230,8 +290,6 @@ impl<'a, 'b> Parser<'a, 'b> {
             Dash => {
                 let mut seq = Vec::new();
                 loop {
-                    println!("{:?}", self.token.kind);
-                    println!("indent = {}", self.indent);
                     match self.token.kind {
                         Newline => {
                             self.indent = 0;
@@ -316,6 +374,19 @@ impl<'a, 'b> Parser<'a, 'b> {
             end += 1;
         }
         Ok((start, end))
+    }
+
+    fn pop_if_match(
+        &mut self,
+        expect: TokenKind<'a>
+    ) -> Result<()> {
+        match self.expected.last() {
+            Some(tk) if matches!(tk, expect) => {
+                self.expected.pop();
+                Ok(())
+            },
+            _ => self.parse_error()
+        }
     }
 }
 
