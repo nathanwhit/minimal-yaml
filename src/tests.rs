@@ -112,7 +112,7 @@ macro_rules! map {
         Mapping(vec![$(Entry { key: Scalar($key) , value: Scalar($val) }),*])
     };
     { $($key : expr => $val : expr);* } => {
-        Mapping(vec![$(Entry { key: $key , value: $val }),*])
+        Mapping(vec![$(Entry { key: $key.into() , value: $val.into() }),*])
     }
 }
 
@@ -281,4 +281,42 @@ and : another
 now with : "some quotes"
 'and' : "a 'few' more"
 "# => map!{ "key" : "value", "key2" : "value2", "and" : "another", "now with" : "some quotes", "and" : "a \'few\' more"}
+);
+
+mk_test!(
+block mapping flow;
+r#"
+key : {the : " value ", 'i s' : a, flow: mapping}
+mind : blown
+wait : [it, works, with, flow, sequences too]
+[now, how, about, one, with, the, flow, mapping, as] : a key
+"# => map!{
+    "key" => map!{ "the" : " value ", "i s": "a", "flow":"mapping"};
+    "mind" => "blown";
+    "wait" => seq!("it", "works", "with", "flow", "sequences too");
+    seq!("now", "how", "about", "one", "with", "the", "flow", "mapping", "as") => "a key"
+}
+);
+
+mk_test!(
+block mapping nested blocks;
+r#"
+key : 
+  the : value
+  is : 
+    nested : mappings
+    wow : 
+      - with a block seq
+      - too
+and : done
+"# => map!{
+    "key" => map! {
+        "the" => "value";
+        "is" => map! {
+            "nested" => "mappings";
+            "wow" => seq!("with a block seq", "too")
+        }
+    };
+    "and" => "done"
+}
 );
