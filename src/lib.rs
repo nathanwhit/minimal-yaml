@@ -9,6 +9,9 @@ pub(crate) type Result<T> = std::result::Result<T, MiniYamlError>;
 
 use parse::Parser;
 use tokenize::Tokenizer;
+
+use std::{fmt, fmt::Display};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// A Yaml Element
 pub enum Yaml<'a> {
@@ -35,6 +38,41 @@ pub enum Yaml<'a> {
     /// ```
     Mapping(Vec<Entry<'a>>),
 }
+
+impl<'a> Display for Yaml<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Yaml::Scalar(slice) => {
+                write!(f, "{}", slice)
+            }
+            Yaml::Sequence(seq) => {
+                write!(f, "[ ")?;
+                let last_idx = seq.len() - 1;
+                for (idx, elem) in seq.iter().enumerate() {
+                    if idx == last_idx {
+                        write!(f, "{}", elem)?;
+                    } else {
+                        write!(f, "{}, ", elem)?;
+                    }
+                }
+                write!(f, " ]")
+            }
+            Yaml::Mapping(map) => {
+                write!(f, "{{")?;
+                let last_idx = map.len() - 1;
+                for (idx, entry) in map.iter().enumerate() {
+                    if idx == last_idx {
+                        write!(f, "{}", entry)?;
+                    } else {
+                        write!(f, "{}, ", entry)?;
+                    }
+                }
+                write!(f, " }}")
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// A Yaml map entry
 pub struct Entry<'a> {
@@ -47,6 +85,12 @@ pub struct Entry<'a> {
 impl<'a> Entry<'a> {
     pub fn new(key: Yaml<'a>, value: Yaml<'a>) -> Self {
         Self { key, value }
+    }
+}
+
+impl<'a> Display for Entry<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} : {}", self.key, self.value)
     }
 }
 
