@@ -87,7 +87,21 @@ impl<'a, 'b> Parser<'a, 'b> {
                 res
             }
             LeftBracket => self.parse_sequence_flow()?,
-            Dash => self.parse_sequence_block()?,
+            Dash => {
+                match self.peek() {
+                    Some(Token{ kind: Dash, ..} ) => {
+                        if self.check_ahead_n(2, |tk| matches!(tk, Dash)) {
+                            self.bump();
+                            self.bump();
+                            self.bump();
+                            self.parse()?
+                        } else {
+                            return self.parse_error()
+                        }
+                    }
+                    _ => self.parse_sequence_block()?
+                }
+            },
             RightBrace | RightBracket => return Err(MiniYamlError::ParseError),
             Whitespace(amt) => {
                 self.indent = amt;
