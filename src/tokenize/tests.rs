@@ -1,3 +1,4 @@
+#![cfg(test)]
 use super::*;
 use TokenKind::*;
 
@@ -8,7 +9,7 @@ fn test_list() {
         - val2
         - val3
     ";
-    let mut tokenizer = Tokenizer::from_str(INPUT);
+    let tokenizer = Tokenizer::from_str(INPUT);
     let tokens = tokenizer.tokenize();
     let expected = vec![
         Token {
@@ -200,7 +201,7 @@ fn test_list() {
 #[test]
 fn test_whitespace() {
     const INPUT: &str = r#"["quoted literal, with , commas,  and  whitespace" , lit]"#;
-    let mut tokenizer = Tokenizer::from_str(INPUT);
+    let tokenizer = Tokenizer::from_str(INPUT);
     let tokens = tokenizer.tokenize();
     let expected = vec![
         Token {
@@ -375,7 +376,7 @@ fn test_map() {
     key2: value2
     key3: value3
     ";
-    let mut tokenizer = Tokenizer::from_str(INPUT);
+    let tokenizer = Tokenizer::from_str(INPUT);
     let tokens = tokenizer.tokenize();
     let expected = vec![
         Token {

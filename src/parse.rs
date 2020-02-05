@@ -1,8 +1,6 @@
-#![allow(unused)]
-use crate::tokenize::{Span, Token, TokenKind};
+use crate::tokenize::{Token, TokenKind};
 use crate::{Entry, MiniYamlError, Yaml};
 use core::iter::{Enumerate, Iterator, Peekable};
-use core::mem;
 use core::slice::Iter;
 
 use crate::Result;
@@ -80,27 +78,25 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let res = self.parse_mapping_flow()?;
                 match self.expected.last() {
                     Some(RightBrace) => {
-                        self.pop_if_match(RightBrace);
+                        self.pop_if_match(RightBrace)?;
                     }
                     _ => (),
                 }
                 res
             }
             LeftBracket => self.parse_sequence_flow()?,
-            Dash => {
-                match self.peek() {
-                    Some(Token{ kind: Dash, ..} ) => {
-                        if self.check_ahead_n(2, |tk| matches!(tk, Dash)) {
-                            self.bump();
-                            self.bump();
-                            self.bump();
-                            self.parse()?
-                        } else {
-                            return self.parse_error()
-                        }
+            Dash => match self.peek() {
+                Some(Token { kind: Dash, .. }) => {
+                    if self.check_ahead_n(2, |tk| matches!(tk, Dash)) {
+                        self.bump();
+                        self.bump();
+                        self.bump();
+                        self.parse()?
+                    } else {
+                        return self.parse_error();
                     }
-                    _ => self.parse_sequence_block()?
                 }
+                _ => self.parse_sequence_block()?,
             },
             RightBrace | RightBracket => return Err(MiniYamlError::ParseError),
             Whitespace(amt) => {
@@ -140,7 +136,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let entire_literal = self.slice_tok_range(tok_range);
                 Ok(Yaml::Scalar(entire_literal))
             }
-            Literal(value) => {
+            Literal(..) => {
                 let stop = |tok: &TokenKind<'_>| {
                     matches!(tok, Comma | Colon | RightBrace | RightBracket | Newline)
                 };
@@ -230,7 +226,6 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 return self.parse_error();
                             }
                         }
-                        _ => return self.parse_error(),
                     }
                 }
                 Ok(Yaml::Mapping(entries))
@@ -394,7 +389,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     fn pop_if_match(&mut self, expect: TokenKind<'a>) -> Result<()> {
         match self.expected.last() {
-            Some(tk) if matches!(tk, expect) => {
+            Some(tk) if tk == &expect => {
                 self.expected.pop();
                 Ok(())
             }

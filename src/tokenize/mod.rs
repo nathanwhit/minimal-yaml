@@ -1,9 +1,6 @@
-#![allow(unused)]
-use super::Result;
-use crate::MiniYamlError;
 use core::fmt;
 use core::iter::{Iterator, Peekable};
-use core::ops::{Add, AddAssign};
+use core::ops::Add;
 mod tests;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ByteIdx(usize);
@@ -37,14 +34,6 @@ impl ByteIdx {
         Span {
             start: self,
             end: other,
-        }
-    }
-    /// Returns a span that begins at the current byte index
-    /// and has a length of `len`.
-    pub(crate) fn spans(self, len: ByteLen) -> Span {
-        Span {
-            start: self,
-            end: self + len,
         }
     }
 }
@@ -184,13 +173,6 @@ impl<'a> Token<'a> {
         Self { kind, span }
     }
 
-    pub(crate) fn is_quote(&self) -> bool {
-        match self.kind {
-            TokenKind::DoubleQuote | TokenKind::SingleQuote => true,
-            _ => false,
-        }
-    }
-
     pub(crate) fn start(&self) -> ByteIdx {
         self.span.start
     }
@@ -217,6 +199,7 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
+    #[allow(unused)]
     pub fn try_from_bytes(raw: &'a [u8]) -> std::result::Result<Self, std::str::Utf8Error> {
         Ok(Self::from_str(std::str::from_utf8(raw)?))
     }
@@ -272,12 +255,6 @@ impl<'a> Tokenizer<'a> {
     /// the source position.
     fn peek(&mut self) -> Option<SourceChar> {
         self.chars.peek().map(SourceChar::from)
-    }
-
-    /// Returns the index of the next character, if one exists,
-    /// without advancing the source position.
-    fn peek_idx(&mut self) -> Option<ByteIdx> {
-        self.chars.peek().map(|tup| ByteIdx(tup.0))
     }
 
     /// Returns the next character, if one exists, and advances
@@ -357,10 +334,6 @@ impl<'a> Tokenizer<'a> {
             &self.source[tok_start.into()..tok_end.into()],
             tok_start.to(tok_end),
         )
-    }
-
-    fn chomp_whitespace(&mut self, start: &SourceChar) {
-        self.consume_matches(start, |chr| chr == ' ' || chr == '\t');
     }
 
     /// Tokenizes the source, consuming the Tokenizer.
