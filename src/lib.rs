@@ -43,7 +43,8 @@ impl<'a> Display for Yaml<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Yaml::Scalar(slice) => {
-                write!(f, "{}", slice)
+                let escaped: String = slice.escape_debug().collect();
+                write!(f, "\"{}\"", escaped)
             }
             Yaml::Sequence(seq) => {
                 write!(f, "[ ")?;
