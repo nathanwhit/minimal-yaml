@@ -317,3 +317,23 @@ and : done
     "and" => "done"
 }
 );
+
+// Misc
+
+mk_test!(
+input with comments;
+r#"
+key: #comment 1
+   - value line 1
+   #comment 2
+   - value line 2
+   #comment 3
+   - value line 3
+"# => map!{
+    "key" => seq!(
+        "value line 1",
+        "value line 2",
+        "value line 3"
+    )
+}
+);
