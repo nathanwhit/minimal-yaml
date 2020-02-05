@@ -1,8 +1,7 @@
 #![cfg(test)]
 
 use crate::{
-    parse, Entry,
-    Yaml,
+    parse, Entry, Yaml,
     Yaml::{Mapping, Scalar, Sequence},
 };
 
@@ -188,7 +187,6 @@ r#"
 "# => seq!("a", "sequence", "with", seq!("a", "sequence", "as ", "a", "node"))
 );
 
-
 mk_test!(
 block sequence flow map;
 r#"
@@ -268,7 +266,6 @@ r##"
         "end"
     )
 );
-
 
 // Block mappings
 

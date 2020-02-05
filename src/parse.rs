@@ -24,7 +24,7 @@ pub(crate) struct Parser<'a, 'b> {
     source: &'a str,
     tok_idx: usize,
     indent: usize,
-    expected: Vec<TokenKind<'a>>
+    expected: Vec<TokenKind<'a>>,
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
@@ -64,19 +64,28 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let node = self.parse_scalar()?;
                 self.chomp_whitespace();
                 match self.token.kind {
-                    Colon if match self.expected.last() { Some(RightBrace) | Some(Colon) => false, _ => true } => self.parse_mapping_block(node)?,
-                    _ => node
+                    Colon
+                        if match self.expected.last() {
+                            Some(RightBrace) | Some(Colon) => false,
+                            _ => true,
+                        } =>
+                    {
+                        self.parse_mapping_block(node)?
+                    }
+                    _ => node,
                 }
             }
             LeftBrace => {
                 self.expected.push(RightBrace);
                 let res = self.parse_mapping_flow()?;
                 match self.expected.last() {
-                    Some(RightBrace) => { self.pop_if_match(RightBrace); },
-                    _ => ()
+                    Some(RightBrace) => {
+                        self.pop_if_match(RightBrace);
+                    }
+                    _ => (),
                 }
                 res
-            },
+            }
             LeftBracket => self.parse_sequence_flow()?,
             Dash => self.parse_sequence_block()?,
             RightBrace | RightBracket => return Err(MiniYamlError::ParseError),
@@ -175,13 +184,6 @@ impl<'a, 'b> Parser<'a, 'b> {
             Colon => {
                 self.bump();
                 let mut entries = Vec::new();
-                // let value = match self.token.kind {
-                //     Newline if match self.peekahead_n(1) {
-                //         Some(&Whitespace(amt)) if amt > indent => true,
-                //         _ => false
-                //     } => self.parse(),
-                // }
-                // let value
                 self.chomp_whitespace();
                 let value = self.parse()?;
                 entries.push(Entry::new(start_key, value));
@@ -204,7 +206,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                             self.expected.push(Colon);
                             let key = self.parse()?;
                             self.chomp_whitespace();
-                            if let Colon = self.token.kind  {
+                            if let Colon = self.token.kind {
                                 self.pop_if_match(Colon)?;
                                 self.bump();
                                 self.chomp_whitespace();
@@ -214,7 +216,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 return self.parse_error();
                             }
                         }
-                        _ => return self.parse_error()
+                        _ => return self.parse_error(),
                     }
                 }
                 Ok(Yaml::Mapping(entries))
@@ -362,7 +364,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             let peeked = self.peekahead_n(1);
             if match peeked {
                 Some(tok_kind) => stop(&self.token.kind, tok_kind),
-                None => stop(&self.token.kind, &TokenKind::default())
+                None => stop(&self.token.kind, &TokenKind::default()),
             } {
                 break;
             } else if !self.bump() {
@@ -376,16 +378,13 @@ impl<'a, 'b> Parser<'a, 'b> {
         Ok((start, end))
     }
 
-    fn pop_if_match(
-        &mut self,
-        expect: TokenKind<'a>
-    ) -> Result<()> {
+    fn pop_if_match(&mut self, expect: TokenKind<'a>) -> Result<()> {
         match self.expected.last() {
             Some(tk) if matches!(tk, expect) => {
                 self.expected.pop();
                 Ok(())
-            },
-            _ => self.parse_error()
+            }
+            _ => self.parse_error(),
         }
     }
 }

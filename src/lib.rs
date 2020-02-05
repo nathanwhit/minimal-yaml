@@ -46,7 +46,7 @@ pub struct Entry<'a> {
 
 impl<'a> Entry<'a> {
     pub fn new(key: Yaml<'a>, value: Yaml<'a>) -> Self {
-        Self {key, value}
+        Self { key, value }
     }
 }
 
