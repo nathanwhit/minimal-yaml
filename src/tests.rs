@@ -268,3 +268,17 @@ r##"
         "end"
     )
 );
+
+
+// Block mappings
+
+mk_test!(
+block mapping simple;
+r#"
+key : value
+key2 : value2
+and : another
+now with : "some quotes"
+'and' : "a 'few' more"
+"# => map!{ "key" : "value", "key2" : "value2", "and" : "another", "now with" : "some quotes", "and" : "a \'few\' more"}
+);
