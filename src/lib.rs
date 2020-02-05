@@ -44,6 +44,12 @@ pub struct Entry<'a> {
     value: Yaml<'a>,
 }
 
+impl<'a> Entry<'a> {
+    pub fn new(key: Yaml<'a>, value: Yaml<'a>) -> Self {
+        Self {key, value}
+    }
+}
+
 /// Parse Yaml input. Returns the top level Yaml element on success,
 /// or a ```MiniYamlError``` on failure
 pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
