@@ -368,6 +368,7 @@ impl<'a> Tokenizer<'a> {
     pub fn tokenize(mut self) -> Vec<Token<'a>> {
         use TokenKind::*;
         while let Some(chr) = self.next_char() {
+            // TODO: Consider preserving comments instead of just throwing them out
             match chr.value {
                 '&' => self.push_tok_with(Ampersand, chr.span()),
                 '*' => self.push_tok_with(Asterisk, chr.span()),
@@ -388,6 +389,9 @@ impl<'a> Tokenizer<'a> {
                 '\t' | ' ' => {
                     let tok = self.consume_whitespace(&chr);
                     self.push_tok(tok);
+                }
+                '#' => {
+                    self.consume_until(&chr, |c| c == '\n');
                 }
                 _ => {
                     if let Token {
