@@ -79,9 +79,9 @@ impl<'a> Display for Yaml<'a> {
 /// A Yaml map entry
 pub struct Entry<'a> {
     /// The key associated with the entry
-    key: Yaml<'a>,
+    pub key: Yaml<'a>,
     /// The value which the key maps to
-    value: Yaml<'a>,
+    pub value: Yaml<'a>,
 }
 
 impl<'a> Entry<'a> {
