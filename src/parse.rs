@@ -163,13 +163,13 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn parse_error<T>(&self) -> Result<T> {
-        let (err_line, err_col) = self.lookup_line_col();
-        Err(MiniYamlError::ParseError(err_line, err_col, String::new()))
+        let (line, col) = self.lookup_line_col();
+        Err(MiniYamlError::ParseError{ line, col, msg: None })
     }
 
     fn parse_error_with_msg<T>(&self, msg: String) -> Result<T> {
-        let (err_line, err_col) = self.lookup_line_col();
-        Err(MiniYamlError::ParseError(err_line, err_col, msg))
+        let (line, col) = self.lookup_line_col();
+        Err(MiniYamlError::ParseError{ line, col, msg: Some(msg) })
     }
 
     pub(crate) fn parse_mapping_flow(&mut self) -> Result<Yaml<'a>> {

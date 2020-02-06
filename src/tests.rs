@@ -352,5 +352,5 @@ mk_test!(
 input with error;
 r#"
 {key: value, missing : }
-"# => err MiniYamlError::ParseError(2, 25, String::new())
+"# => err MiniYamlError::ParseError{ line: 2, col: 25, msg: None }
 );
