@@ -163,7 +163,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             }
             off += line.len();
         }
-        (0, 0)
+        panic!("Internal error occurred, please report this issue at https://github.com/nathanwhit/minimal-yaml/issues")
     }
 
     fn parse_error<T>(&self) -> Result<T> {
