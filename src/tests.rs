@@ -2,6 +2,7 @@
 
 use crate::{
     parse, Entry, Yaml,
+    errors::MiniYamlError,
     Yaml::{Mapping, Scalar, Sequence},
 };
 
@@ -18,6 +19,15 @@ macro_rules! mk_test {
             fn [<test_parse_$($name _)+>] () {
                 const INPUT: &str = $inp;
                 assert_eq!(parse(INPUT).unwrap(), $exp);
+            }
+        }
+    };
+    ($($name: ident) +; $inp: expr => err $exp: expr) => {
+        paste::item! {
+            #[test]
+            fn [<test_parse_$($name _)+>] () {
+                const INPUT: &str = $inp;
+                assert_eq!(parse(INPUT).unwrap_err(), $exp);
             }
         }
     };
@@ -336,4 +346,11 @@ key: #comment 1
         "value line 3"
     )
 }
+);
+
+mk_test!(
+input with error;
+r#"
+{key: value, missing : }
+"# => err MiniYamlError::ParseError(2, 25, String::new())
 );
