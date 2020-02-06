@@ -98,7 +98,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 }
                 _ => self.parse_sequence_block()?,
             },
-            RightBrace | RightBracket => return Err(MiniYamlError::ParseError),
+            RightBrace | RightBracket => return self.parse_error(),
             Whitespace(amt) => {
                 self.indent = amt;
                 self.bump();
@@ -150,8 +150,26 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
+    fn lookup_line_col(&self) -> (usize, usize) {
+        let err_off: usize = self.token.start().into();
+        let mut off = 0;
+        for (line_num, line) in self.source.lines().enumerate() {
+            if err_off >= off && err_off <= off+line.len() {
+                return (line_num+1, err_off - off + 1);
+            }
+            off += line.len();
+        }
+        (0, 0)
+    }
+
     fn parse_error<T>(&self) -> Result<T> {
-        Err(MiniYamlError::ParseError)
+        let (err_line, err_col) = self.lookup_line_col();
+        Err(MiniYamlError::ParseError(err_line, err_col, String::new()))
+    }
+
+    fn parse_error_with_msg<T>(&self, msg: String) -> Result<T> {
+        let (err_line, err_col) = self.lookup_line_col();
+        Err(MiniYamlError::ParseError(err_line, err_col, msg))
     }
 
     pub(crate) fn parse_mapping_flow(&mut self) -> Result<Yaml<'a>> {
@@ -277,7 +295,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                                     self.bump();
                                     return Ok(Yaml::Sequence(elements));
                                 }
-                                _ => return Err(MiniYamlError::ParseError),
+                                _ => return self.parse_error(),
                             }
                         }
                     }
