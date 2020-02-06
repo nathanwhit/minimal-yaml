@@ -31,6 +31,15 @@ macro_rules! mk_test {
             }
         }
     };
+    ($($name: ident) +; $inp: expr => err msg $exp: expr) => {
+        paste::item! {
+            #[test]
+            fn [<test_parse_$($name _)+>] () {
+                const INPUT: &str = $inp;
+                assert_eq!(parse(INPUT).unwrap_err().to_string(), $exp);
+            }
+        }
+    };
 }
 
 // Scalars
@@ -353,4 +362,30 @@ input with error;
 r#"
 {key: value, missing : }
 "# => err MiniYamlError::ParseError{ line: 2, col: 25, msg: None }
+);
+
+mk_test!(
+error msg;
+r#"
+{key: value, missing : }
+"# => err msg "parsing error occurred at line 2 col 25"
+);
+
+mk_test!(
+input with doc start;
+r"
+---
+- this
+- is
+- a
+- 
+  sequence : of
+  values : in
+  a : yaml file
+" => seq!(
+    "this", "is", "a",
+    map! {
+        "sequence" : "of", "values" : "in", "a" : "yaml file"
+    }
+)
 );
