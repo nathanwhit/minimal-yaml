@@ -1,8 +1,8 @@
 #![cfg(test)]
 
 use crate::{
-    parse, Entry, Yaml,
     errors::MiniYamlError,
+    parse, Entry, Yaml,
     Yaml::{Mapping, Scalar, Sequence},
 };
 

@@ -93,11 +93,13 @@ impl<'a, 'b> Parser<'a, 'b> {
                         self.bump();
                         self.parse()?
                     } else {
+                        // TODO: Provide error message
                         return self.parse_error();
                     }
                 }
                 _ => self.parse_sequence_block()?,
             },
+            // TODO: Provide error message
             RightBrace | RightBracket => return self.parse_error(),
             Whitespace(amt) => {
                 self.indent = amt;
@@ -109,6 +111,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 self.bump();
                 self.parse()?
             }
+            // TODO: Provide error message
             _ => return self.parse_error(),
         };
         Ok(res)
@@ -146,6 +149,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let entire_literal = self.slice_tok_range(tok_range);
                 Ok(Yaml::Scalar(entire_literal))
             }
+            // TODO: Provide error message
             _ => self.parse_error(),
         }
     }
@@ -154,8 +158,8 @@ impl<'a, 'b> Parser<'a, 'b> {
         let err_off: usize = self.token.start().into();
         let mut off = 0;
         for (line_num, line) in self.source.lines().enumerate() {
-            if err_off >= off && err_off <= off+line.len() {
-                return (line_num+1, err_off - off + 1);
+            if err_off >= off && err_off <= off + line.len() {
+                return (line_num + 1, err_off - off + 1);
             }
             off += line.len();
         }
@@ -164,12 +168,20 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     fn parse_error<T>(&self) -> Result<T> {
         let (line, col) = self.lookup_line_col();
-        Err(MiniYamlError::ParseError{ line, col, msg: None })
+        Err(MiniYamlError::ParseError {
+            line,
+            col,
+            msg: None,
+        })
     }
 
     fn parse_error_with_msg<T>(&self, msg: String) -> Result<T> {
         let (line, col) = self.lookup_line_col();
-        Err(MiniYamlError::ParseError{ line, col, msg: Some(msg) })
+        Err(MiniYamlError::ParseError {
+            line,
+            col,
+            msg: Some(msg),
+        })
     }
 
     pub(crate) fn parse_mapping_flow(&mut self) -> Result<Yaml<'a>> {
@@ -198,6 +210,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                             self.chomp_whitespace();
                             entries.push(Entry { key, value })
                         }
+                        // TODO: Provide error message
                         _ => return self.parse_error(),
                     }
                 }
@@ -241,6 +254,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 let value = self.parse()?;
                                 entries.push(Entry::new(key, value));
                             } else {
+                                // TODO: Provide error message
                                 return self.parse_error();
                             }
                         }
@@ -248,6 +262,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 }
                 Ok(Yaml::Mapping(entries))
             }
+            // TODO: Provide error message
             _ => self.parse_error(),
         }
     }
@@ -295,12 +310,14 @@ impl<'a, 'b> Parser<'a, 'b> {
                                     self.bump();
                                     return Ok(Yaml::Sequence(elements));
                                 }
+                                // TODO: Provide error message
                                 _ => return self.parse_error(),
                             }
                         }
                     }
                 }
             }
+            // TODO: Provide error message
             _ => self.parse_error(),
         }
     }
@@ -362,6 +379,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 }
                 Ok(Yaml::Sequence(seq))
             }
+            // TODO: Provide error message
             _ => self.parse_error(),
         }
     }
@@ -397,6 +415,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             } else if !self.bump() {
                 return match cond {
                     TakeUntilCond::MatchOrEnd => Ok((start, self.tok_stream.len())),
+                    // TODO: Provide error message
                     TakeUntilCond::MatchOrErr => self.parse_error(),
                 };
             }
@@ -411,6 +430,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 self.expected.pop();
                 Ok(())
             }
+            // TODO: Provide error message
             _ => self.parse_error(),
         }
     }
