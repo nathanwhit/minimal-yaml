@@ -96,7 +96,10 @@ impl<'a, 'b> Parser<'a, 'b> {
                 }
                 _ => self.parse_sequence_block()?,
             },
-            RightBrace | RightBracket => return self.parse_error_with_msg(format!(r#"unexpected symbol '{}'"#, self.token.kind)),
+            RightBrace | RightBracket => {
+                return self
+                    .parse_error_with_msg(format!(r#"unexpected symbol '{}'"#, self.token.kind))
+            }
             Whitespace(amt) => {
                 self.indent = amt;
                 self.bump();

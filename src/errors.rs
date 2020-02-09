@@ -24,7 +24,7 @@ pub struct YamlParseError {
     pub(crate) col: usize,
     /// more information about the error, if there is any
     pub(crate) msg: Option<String>,
-    pub(crate) source: Option<MiniYamlError>
+    pub(crate) source: Option<MiniYamlError>,
 }
 
 impl Error for YamlParseError {}
@@ -32,8 +32,16 @@ impl Error for YamlParseError {}
 impl fmt::Display for YamlParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.msg {
-            Some(ref msg) => write!(f, "error occurred parsing the input at line {}, column {} : {}", self.line, self.col, msg),
-            None => write!(f, "error occurred parsing the input at line {}, column {}", self.line, self.col),
+            Some(ref msg) => write!(
+                f,
+                "error occurred parsing the input at line {}, column {} : {}",
+                self.line, self.col, msg
+            ),
+            None => write!(
+                f,
+                "error occurred parsing the input at line {}, column {}",
+                self.line, self.col
+            ),
         }
     }
 }
@@ -54,11 +62,10 @@ impl fmt::Display for MiniYamlError {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum YamlFromBytesError {
     ParseError(YamlParseError),
-    Utf8Error(std::str::Utf8Error)
+    Utf8Error(std::str::Utf8Error),
 }
 
 impl std::error::Error for YamlFromBytesError {}

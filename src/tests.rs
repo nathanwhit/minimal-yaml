@@ -1,10 +1,9 @@
 #![cfg(test)]
 
 use crate::{
-    YamlParseError,
-    YamlFromBytesError,
     parse, try_parse_from_utf8, Entry, Yaml,
     Yaml::{Mapping, Scalar, Sequence},
+    YamlFromBytesError, YamlParseError,
 };
 
 impl<'a> From<&'a str> for Yaml<'a> {
@@ -32,13 +31,27 @@ macro_rules! mk_test {
             }
         }
     };
-    ($($name: ident) +; $inp: expr => matches $exp: expr) => {
+    ($($name: ident) +; $inp: expr => matches bytes $exp: expr) => {
         paste::item! {
             #[test]
             fn [<test_parse_$($name _)+>] () {
                 const INPUT: &[u8] = $inp;
                 assert!(
                     match try_parse_from_utf8(INPUT) {
+                        $exp => true,
+                        _ => false,
+                    }
+                );
+            }
+        }
+    };
+    ($($name: ident) +; $inp: expr => matches $exp: expr) => {
+        paste::item! {
+            #[test]
+            fn [<test_parse_$($name _)+>] () {
+                const INPUT: &str = $inp;
+                assert!(
+                    match parse(INPUT) {
                         $exp => true,
                         _ => false,
                     }
@@ -407,6 +420,5 @@ r"
 
 mk_test!(
 byte input invalid utf8;
-&[0x80, 0xBF, b'-'] => matches std::result::Result::Err(YamlFromBytesError::Utf8Error(..))
+&[0x80, 0xBF, b'-'] => matches bytes std::result::Result::Err(YamlFromBytesError::Utf8Error(..))
 );
-

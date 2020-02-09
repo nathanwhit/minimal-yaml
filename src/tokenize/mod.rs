@@ -231,7 +231,8 @@ impl SourceChar {
 }
 
 impl<T> From<T> for SourceChar
-    where T: std::borrow::Borrow<(usize, char)>
+where
+    T: std::borrow::Borrow<(usize, char)>,
 {
     fn from(other: T) -> Self {
         Self {

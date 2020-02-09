@@ -4,7 +4,7 @@ mod parse;
 mod tests;
 mod tokenize;
 
-pub use crate::errors::{YamlParseError, YamlFromBytesError};
+pub use crate::errors::{YamlFromBytesError, YamlParseError};
 
 pub(crate) type Result<T> = std::result::Result<T, YamlParseError>;
 
@@ -113,7 +113,9 @@ pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
 /// # Errors
 /// Returns `Err` if the input is not valid UTF-8 or if the input is invalid Yaml, with a message
 /// indicating either why the slice was invalid UTF-8, or where the Yaml parsing error occurred.
-pub fn try_parse_from_utf8<'a>(input: &'a [u8]) -> std::result::Result<Yaml<'a>, YamlFromBytesError> {
+pub fn try_parse_from_utf8<'a>(
+    input: &'a [u8],
+) -> std::result::Result<Yaml<'a>, YamlFromBytesError> {
     let input = std::str::from_utf8(input)?;
     parse(input).map_err(YamlFromBytesError::from)
 }
