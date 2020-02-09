@@ -2,7 +2,8 @@
 
 use crate::{
     YamlParseError,
-    parse, Entry, Yaml,
+    YamlFromBytesError,
+    parse, try_parse_from_utf8, Entry, Yaml,
     Yaml::{Mapping, Scalar, Sequence},
 };
 
@@ -28,6 +29,20 @@ macro_rules! mk_test {
             fn [<test_parse_$($name _)+>] () {
                 const INPUT: &str = $inp;
                 assert_eq!(parse(INPUT).unwrap_err(), $exp);
+            }
+        }
+    };
+    ($($name: ident) +; $inp: expr => matches $exp: expr) => {
+        paste::item! {
+            #[test]
+            fn [<test_parse_$($name _)+>] () {
+                const INPUT: &[u8] = $inp;
+                assert!(
+                    match try_parse_from_utf8(INPUT) {
+                        $exp => true,
+                        _ => false,
+                    }
+                );
             }
         }
     };
@@ -389,3 +404,9 @@ r"
     }
 )
 );
+
+mk_test!(
+byte input invalid utf8;
+&[0x80, 0xBF, b'-'] => matches std::result::Result::Err(YamlFromBytesError::Utf8Error(..))
+);
+
