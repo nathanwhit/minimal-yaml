@@ -5,7 +5,7 @@ use std::error::Error;
 #[non_exhaustive]
 #[allow(dead_code)]
 #[doc(hidden)]
-pub enum MiniYamlError {
+pub(crate) enum MiniYamlError {
     /// error produced when an alias is encountered in the parser input
     AliasesDisallowed,
     /// error produced when an anchor is encountered in the parser input

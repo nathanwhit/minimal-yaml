@@ -96,8 +96,10 @@ impl<'a> Display for Entry<'a> {
     }
 }
 
-/// Parse Yaml input. Returns the top level Yaml element on success,
-/// or a [`YamlParseError`]on failure
+/// Parse Yaml input. Returns the top level Yaml element on success
+/// # Errors
+/// Returns `Err` if the input is invalid Yaml, with a message indicating
+/// where the error occurred and possibly more information on the cause
 pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
     let tokenizer = Tokenizer::from_str(input);
     let tokens = tokenizer.tokenize();
@@ -105,6 +107,10 @@ pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
     parser.parse()
 }
 
+/// Parse Yaml input from valid UTF-8 bytes. Returns the top level Yaml element on success.
+/// # Errors
+/// Returns `Err` if the input is not valid UTF-8 or if the input is invalid Yaml, with a message
+/// indicating either why the slice was invalid UTF-8, or where the Yaml parsing error occurred.
 pub fn try_parse_from_bytes<'a>(input: &'a [u8]) -> std::result::Result<Yaml<'a>, YamlFromBytesError> {
     let input = std::str::from_utf8(input)?;
     parse(input).map_err(YamlFromBytesError::from)
