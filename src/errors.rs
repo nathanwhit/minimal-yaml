@@ -5,6 +5,7 @@ use std::error::Error;
 #[non_exhaustive]
 #[allow(dead_code)]
 #[doc(hidden)]
+#[allow(clippy::enum_variant_names)]
 pub(crate) enum MiniYamlError {
     /// error produced when an alias is encountered in the parser input
     AliasesDisallowed,

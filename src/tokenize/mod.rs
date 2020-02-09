@@ -230,11 +230,13 @@ impl SourceChar {
     }
 }
 
-impl From<&(usize, char)> for SourceChar {
-    fn from(other: &(usize, char)) -> Self {
+impl<T> From<T> for SourceChar
+    where T: std::borrow::Borrow<(usize, char)>
+{
+    fn from(other: T) -> Self {
         Self {
-            idx: ByteIdx(other.0),
-            value: other.1,
+            idx: ByteIdx(other.borrow().0),
+            value: other.borrow().1,
         }
     }
 }
@@ -260,7 +262,7 @@ impl<'a> Tokenizer<'a> {
     /// Returns the next character, if one exists, and advances
     /// the source position.
     fn next_char(&mut self) -> Option<SourceChar> {
-        self.chars.next().map(|ref tup| SourceChar::from(tup))
+        self.chars.next().map(SourceChar::from)
     }
 
     /// Advances the source position by one character. Returns `false`
@@ -312,22 +314,17 @@ impl<'a> Tokenizer<'a> {
     ) -> SourceStr<'a> {
         let tok_start = start.end();
         let mut tok_end = start.end();
-        loop {
-            match self.peek() {
-                Some(chr) => {
-                    tok_end = chr.end();
+        while let Some(chr) = self.peek() {
+            tok_end = chr.end();
+            self.advance();
+            if chr.value == '\\' {
+                if let Some(next_chr) = self.peek() {
+                    tok_end = next_chr.end();
                     self.advance();
-                    if chr.value == '\\' {
-                        if let Some(next_chr) = self.peek() {
-                            tok_end = next_chr.end();
-                            self.advance();
-                        }
-                    }
-                    if end_cond(chr.value) {
-                        break;
-                    }
                 }
-                _ => break,
+            }
+            if end_cond(chr.value) {
+                break;
             }
         }
         SourceStr::new(

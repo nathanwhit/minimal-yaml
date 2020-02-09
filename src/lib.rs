@@ -85,6 +85,7 @@ pub struct Entry<'a> {
 }
 
 impl<'a> Entry<'a> {
+    #[allow(clippy::must_use_candidate)]
     pub fn new(key: Yaml<'a>, value: Yaml<'a>) -> Self {
         Self { key, value }
     }
@@ -107,6 +108,7 @@ pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
     parser.parse()
 }
 
+#[allow(clippy::needless_lifetimes)]
 /// Parse Yaml input from valid UTF-8 bytes. Returns the top level Yaml element on success.
 /// # Errors
 /// Returns `Err` if the input is not valid UTF-8 or if the input is invalid Yaml, with a message

@@ -76,11 +76,8 @@ impl<'a, 'b> Parser<'a, 'b> {
             LeftBrace => {
                 self.expected.push(RightBrace);
                 let res = self.parse_mapping_flow()?;
-                match self.expected.last() {
-                    Some(RightBrace) => {
-                        self.pop_if_match(&RightBrace)?;
-                    }
-                    _ => (),
+                if let Some(RightBrace) = self.expected.last() {
+                    self.pop_if_match(&RightBrace)?;
                 }
                 res
             }
@@ -436,7 +433,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 }
-
+#[derive(Clone, Copy)]
 enum TakeUntilCond {
     MatchOrEnd,
     MatchOrErr,
