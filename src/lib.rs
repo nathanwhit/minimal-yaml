@@ -1,12 +1,12 @@
 #![warn(clippy::all, clippy::pedantic)]
-pub mod errors;
+mod errors;
 mod parse;
 mod tests;
 mod tokenize;
 
-pub use crate::errors::MiniYamlError;
+pub use crate::errors::{YamlParseError, YamlFromBytesError};
 
-pub(crate) type Result<T> = std::result::Result<T, MiniYamlError>;
+pub(crate) type Result<T> = std::result::Result<T, YamlParseError>;
 
 use parse::Parser;
 use tokenize::Tokenizer;
@@ -97,7 +97,7 @@ impl<'a> Display for Entry<'a> {
 }
 
 /// Parse Yaml input. Returns the top level Yaml element on success,
-/// or a ```MiniYamlError``` on failure
+/// or a [`YamlParseError`]on failure
 pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
     let tokenizer = Tokenizer::from_str(input);
     let tokens = tokenizer.tokenize();

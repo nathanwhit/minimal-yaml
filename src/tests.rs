@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate::{
-    errors::MiniYamlError,
+    YamlParseError,
     parse, Entry, Yaml,
     Yaml::{Mapping, Scalar, Sequence},
 };
@@ -361,14 +361,14 @@ mk_test!(
 input with error;
 r#"
 {key: value, missing : }
-"# => err MiniYamlError::ParseError{ line: 2, col: 25, msg: None }
+"# => err YamlParseError{ line: 2, col: 25, msg: Some(String::from(r#"unexpected symbol '}'"#)), source: None }
 );
 
 mk_test!(
 error msg;
 r#"
 {key: value, missing : }
-"# => err msg "parsing error occurred at line 2 col 25"
+"# => err msg r#"error occurred parsing the input at line 2, column 25 : unexpected symbol '}'"#
 );
 
 mk_test!(

@@ -1,5 +1,5 @@
 use crate::tokenize::{Token, TokenKind};
-use crate::{Entry, MiniYamlError, Yaml};
+use crate::{Entry, Yaml, YamlParseError};
 use core::iter::{Enumerate, Iterator, Peekable};
 use core::slice::Iter;
 
@@ -99,8 +99,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 }
                 _ => self.parse_sequence_block()?,
             },
-            // TODO: Provide error message
-            RightBrace | RightBracket => return self.parse_error(),
+            RightBrace | RightBracket => return self.parse_error_with_msg(format!(r#"unexpected symbol '{}'"#, self.token.kind)),
             Whitespace(amt) => {
                 self.indent = amt;
                 self.bump();
@@ -168,19 +167,21 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     fn parse_error<T>(&self) -> Result<T> {
         let (line, col) = self.lookup_line_col();
-        Err(MiniYamlError::ParseError {
+        Err(YamlParseError {
             line,
             col,
             msg: None,
+            source: None,
         })
     }
 
-    fn parse_error_with_msg<T>(&self, msg: String) -> Result<T> {
+    fn parse_error_with_msg<T, S: Into<String>>(&self, msg: S) -> Result<T> {
         let (line, col) = self.lookup_line_col();
-        Err(MiniYamlError::ParseError {
+        Err(YamlParseError {
             line,
             col,
-            msg: Some(msg),
+            msg: Some(msg.into()),
+            source: None,
         })
     }
 
