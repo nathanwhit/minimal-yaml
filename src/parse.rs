@@ -78,7 +78,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let res = self.parse_mapping_flow()?;
                 match self.expected.last() {
                     Some(RightBrace) => {
-                        self.pop_if_match(RightBrace)?;
+                        self.pop_if_match(&RightBrace)?;
                     }
                     _ => (),
                 }
@@ -204,7 +204,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                     self.chomp_whitespace();
                     match self.token.kind {
                         Colon => {
-                            self.pop_if_match(Colon)?;
+                            self.pop_if_match(&Colon)?;
                             self.bump();
                             self.chomp_whitespace();
                             let value = self.parse()?;
@@ -249,7 +249,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                             let key = self.parse()?;
                             self.chomp_whitespace();
                             if let Colon = self.token.kind {
-                                self.pop_if_match(Colon)?;
+                                self.pop_if_match(&Colon)?;
                                 self.bump();
                                 self.chomp_whitespace();
                                 let value = self.parse()?;
@@ -425,9 +425,9 @@ impl<'a, 'b> Parser<'a, 'b> {
         Ok((start, end))
     }
 
-    fn pop_if_match(&mut self, expect: TokenKind<'a>) -> Result<()> {
+    fn pop_if_match(&mut self, expect: &TokenKind<'a>) -> Result<()> {
         match self.expected.last() {
-            Some(tk) if tk == &expect => {
+            Some(tk) if tk == expect => {
                 self.expected.pop();
                 Ok(())
             }

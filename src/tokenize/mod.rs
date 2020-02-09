@@ -200,8 +200,8 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[allow(unused)]
-    pub fn try_from_bytes(raw: &'a [u8]) -> std::result::Result<Self, std::str::Utf8Error> {
-        Ok(Self::from_str(std::str::from_utf8(raw)?))
+    pub fn new(raw: &'a str) -> Self {
+        Self::from_str(raw)
     }
 }
 #[derive(Debug, Clone)]
