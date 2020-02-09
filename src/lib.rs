@@ -104,3 +104,8 @@ pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
     let mut parser = Parser::new(input, &tokens);
     parser.parse()
 }
+
+pub fn try_parse_from_bytes<'a>(input: &'a [u8]) -> std::result::Result<Yaml<'a>, YamlFromBytesError> {
+    let input = std::str::from_utf8(input)?;
+    parse(input).map_err(YamlFromBytesError::from)
+}
