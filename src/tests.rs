@@ -422,3 +422,39 @@ mk_test!(
 byte input invalid utf8;
 &[0x80, 0xBF, b'-'] => matches bytes std::result::Result::Err(YamlFromBytesError::Utf8Error(..))
 );
+
+
+mk_test!(
+input with seq and dash;
+r"
+---
+- this
+- is
+- a
+- valid
+- minimal-yaml
+- sequence
+" => seq!("this", "is", "a", "valid", "minimal-yaml", "sequence")
+);
+
+mk_test!(
+odd structure;
+r"
+this is :
+ - totally
+ - valid
+ - input : to the parser
+" => map!{ "this is" => seq!("totally", "valid", map!{ "input": "to the parser"})  }
+);
+
+mk_test!(
+readme example;
+r"
+[this, is] :
+ -
+  -totally
+  - valid
+ - input
+ - {to : the parser}
+ " => map!{ seq!("this", "is") => seq!( seq!("totally","valid"), "input", map!{"to":"the parser"})}
+);
