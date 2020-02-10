@@ -63,6 +63,10 @@ impl<'a, 'b> Parser<'a, 'b> {
         self.stream.peek().map(|t| t.1)
     }
 
+    fn at_end(&self) -> bool {
+        self.tok_idx == self.tok_stream.len()-1
+    }
+
     fn parse_mapping_maybe(&mut self, node: Yaml<'a>) -> Result<Yaml<'a>> {
         use TokenKind::*;
         self.chomp_whitespace();
@@ -372,7 +376,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                             self.indent = idt;
                             if !self.bump() { break; }
                         }
-                        _ if self.indent < indent => break,
+                        _ if self.indent < indent || self.at_end() => break,
                         Dash => {
                             if self.check_ahead_1(|t| matches!(t, Newline)) {
                                 self.advance()?;
@@ -397,7 +401,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 seq.push(node);
                             }
                         }
-                        _ => break,
+                        _ => return self.parse_error()
                     }
                 }
                 Ok(Yaml::Sequence(seq))
