@@ -176,11 +176,16 @@ impl<'a, 'b> Parser<'a, 'b> {
     fn lookup_line_col(&self) -> (usize, usize) {
         let err_off: usize = self.token.start().into();
         let mut off = 0;
+        let mut line_no = 0;
         for (line_num, line) in self.source.lines().enumerate() {
             if err_off >= off && err_off <= off + line.len() {
                 return (line_num + 1, err_off - off + 1);
             }
             off += line.len();
+            line_no += 1;
+        }
+        if err_off >= off {
+            return (line_no, err_off - off + 1)
         }
         panic!("Internal error occurred, please report this issue at https://github.com/nathanwhit/minimal-yaml/issues")
     }
