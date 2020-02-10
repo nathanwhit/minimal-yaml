@@ -51,6 +51,14 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
+    fn advance(&mut self) -> Result<()> {
+        if self.bump() {
+            Ok(())
+        } else {
+            self.parse_error_with_msg("unexpected end of input")
+        }
+    }
+
     fn peek(&mut self) -> Option<&Token<'a>> {
         self.stream.peek().map(|t| t.1)
     }
@@ -110,7 +118,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             }
             Whitespace(amt) => {
                 self.indent = amt;
-                self.bump();
+                self.advance()?;
                 self.parse()?
             }
             Newline => {
@@ -131,7 +139,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             // TODO: currently qouble quote/single quote scalars are handled identically. maybe handle as defined
             // by the YAML spec?
             DoubleQuote => {
-                self.bump();
+                self.advance()?;
                 let tok_range = self.take_until(MatchOrErr, |tok, _| matches!(tok, DoubleQuote))?;
                 debug_assert!(matches!(self.token.kind, DoubleQuote));
                 self.bump();
@@ -195,7 +203,11 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub(crate) fn parse_mapping_flow(&mut self) -> Result<Yaml<'a>> {
         use TokenKind::*;
-        self.bump();
+        match self.token.kind {
+            LeftBrace => (),
+            _ => return self.parse_error_with_msg("expected left brace"),
+        }
+        self.advance()?;
         let mut entries: Vec<Entry<'a>> = Vec::new();
         loop {
             match self.token.kind {
@@ -204,7 +216,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                     return Ok(Yaml::Mapping(entries));
                 }
                 Comma => {
-                    self.bump();
+                    self.advance()?;
                 }
                 _ => {
                     self.expected.push(Colon);
@@ -213,7 +225,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                     match self.token.kind {
                         Colon => {
                             self.pop_if_match(&Colon)?;
-                            self.bump();
+                            self.advance()?;
                             self.chomp_whitespace();
                             let value = self.parse()?;
                             self.chomp_whitespace();
@@ -232,7 +244,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         let indent = self.indent;
         match self.token.kind {
             Colon => {
-                self.bump();
+                self.advance()?;
                 let mut entries = Vec::new();
                 self.chomp_whitespace();
                 let value = self.parse()?;
@@ -248,8 +260,8 @@ impl<'a, 'b> Parser<'a, 'b> {
                             }
                         }
                         Whitespace(idt) => {
-                            self.bump();
                             self.indent = idt;
+                            if !self.bump() {break;}
                         }
                         _ if self.indent < indent => break,
                         _ => {
@@ -258,7 +270,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                             self.chomp_whitespace();
                             if let Colon = self.token.kind {
                                 self.pop_if_match(&Colon)?;
-                                self.bump();
+                                self.advance()?;
                                 self.chomp_whitespace();
                                 let value = self.parse()?;
                                 entries.push(Entry::new(key, value));
@@ -287,7 +299,9 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     fn chomp_whitespace(&mut self) {
         while let TokenKind::Whitespace(..) = self.token.kind {
-            self.bump();
+            if !self.bump() {
+                break;
+            }
         }
     }
 
@@ -295,7 +309,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         use TokenKind::*;
         match self.token.kind {
             LeftBracket => {
-                self.bump();
+                self.advance()?;
                 let mut elements = Vec::new();
                 loop {
                     match self.token.kind {
@@ -312,7 +326,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                             self.chomp_whitespace();
                             match self.token.kind {
                                 Comma => {
-                                    self.bump();
+                                    self.advance()?;
                                     continue;
                                 }
                                 RightBracket => {
@@ -355,14 +369,14 @@ impl<'a, 'b> Parser<'a, 'b> {
                             }
                         }
                         Whitespace(idt) => {
-                            self.bump();
                             self.indent = idt;
+                            if !self.bump() { break; }
                         }
                         _ if self.indent < indent => break,
                         Dash => {
                             if self.check_ahead_1(|t| matches!(t, Newline)) {
-                                self.bump();
-                                self.bump();
+                                self.advance()?;
+                                self.advance()?;
                                 self.indent = 0;
                                 if let Whitespace(idt) = self.token.kind {
                                     if idt < indent {
@@ -378,7 +392,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                                     seq.push(node);
                                 }
                             } else {
-                                self.bump();
+                                self.advance()?;
                                 let node = self.parse()?;
                                 seq.push(node);
                             }
