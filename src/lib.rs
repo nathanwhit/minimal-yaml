@@ -12,7 +12,7 @@ use parse::Parser;
 use tokenize::Tokenizer;
 
 use std::{fmt, fmt::Display};
-
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// A Yaml Element
 pub enum Yaml<'a> {
@@ -40,7 +40,7 @@ pub enum Yaml<'a> {
     Mapping(Vec<Entry<'a>>),
 }
 
-impl<'a> Display for Yaml<'a> {
+impl Display for Yaml<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Yaml::Scalar(slice) => {
@@ -74,7 +74,7 @@ impl<'a> Display for Yaml<'a> {
         }
     }
 }
-
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// A Yaml map entry
 pub struct Entry<'a> {
