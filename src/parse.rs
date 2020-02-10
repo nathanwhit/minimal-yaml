@@ -55,23 +55,28 @@ impl<'a, 'b> Parser<'a, 'b> {
         self.stream.peek().map(|t| t.1)
     }
 
+    fn parse_mapping_maybe(&mut self, node: Yaml<'a>) -> Result<Yaml<'a>> {
+        use TokenKind::*;
+        self.chomp_whitespace();
+        match self.token.kind {
+            Colon
+                if match self.expected.last() {
+                    Some(RightBrace) | Some(Colon) => false,
+                    _ => true,
+                } =>
+            {
+                self.parse_mapping_block(node)
+            }
+            _ => Ok(node)
+        }
+    }
+
     pub(crate) fn parse(&mut self) -> Result<Yaml<'a>> {
         use TokenKind::*;
         let res = match self.token.kind {
             DoubleQuote | SingleQuote | Literal(..) => {
                 let node = self.parse_scalar()?;
-                self.chomp_whitespace();
-                match self.token.kind {
-                    Colon
-                        if match self.expected.last() {
-                            Some(RightBrace) | Some(Colon) => false,
-                            _ => true,
-                        } =>
-                    {
-                        self.parse_mapping_block(node)?
-                    }
-                    _ => node,
-                }
+                self.parse_mapping_maybe(node)?
             }
             LeftBrace => {
                 self.expected.push(RightBrace);
@@ -79,9 +84,12 @@ impl<'a, 'b> Parser<'a, 'b> {
                 if let Some(RightBrace) = self.expected.last() {
                     self.pop_if_match(&RightBrace)?;
                 }
-                res
+                self.parse_mapping_maybe(res)?
             }
-            LeftBracket => self.parse_sequence_flow()?,
+            LeftBracket => {
+                let node = self.parse_sequence_flow()?;
+                self.parse_mapping_maybe(node)?
+            },
             Dash => match self.peek() {
                 Some(Token { kind: Dash, .. }) => {
                     if self.check_ahead_n(2, |tk| matches!(tk, Dash)) {
