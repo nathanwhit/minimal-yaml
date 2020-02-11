@@ -127,7 +127,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             }
             Newline => {
                 self.indent = 0;
-                self.bump();
+                self.advance()?;
                 self.parse()?
             }
             // TODO: Provide error message
@@ -272,7 +272,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                             self.indent = idt;
                             if !self.bump() {break;}
                         }
-                        _ if self.indent < indent => break,
+                        _ if self.indent < indent || self.at_end() => break,
                         _ => {
                             self.expected.push(Colon);
                             let key = self.parse()?;
