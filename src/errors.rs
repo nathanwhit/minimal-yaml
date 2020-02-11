@@ -1,4 +1,4 @@
-use core::{fmt, fmt::Display};
+use core::fmt;
 use std::error::Error;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -59,34 +59,5 @@ impl fmt::Display for MiniYamlError {
                 MiniYamlError::TagsDisallowed => "tags are disallowed in minimal-yaml",
             }
         )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum YamlFromBytesError {
-    ParseError(YamlParseError),
-    Utf8Error(std::str::Utf8Error),
-}
-
-impl std::error::Error for YamlFromBytesError {}
-
-impl Display for YamlFromBytesError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::ParseError(e) => <YamlParseError as Display>::fmt(e, f),
-            Self::Utf8Error(e) => <std::str::Utf8Error as Display>::fmt(e, f),
-        }
-    }
-}
-
-impl From<YamlParseError> for YamlFromBytesError {
-    fn from(other: YamlParseError) -> Self {
-        Self::ParseError(other)
-    }
-}
-
-impl From<std::str::Utf8Error> for YamlFromBytesError {
-    fn from(other: std::str::Utf8Error) -> Self {
-        Self::Utf8Error(other)
     }
 }

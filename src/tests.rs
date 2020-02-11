@@ -1,9 +1,9 @@
 #![cfg(test)]
 
 use crate::{
-    parse, try_parse_from_utf8, Entry, Yaml,
+    parse, Entry, Yaml,
     Yaml::{Mapping, Scalar, Sequence},
-    YamlFromBytesError, YamlParseError,
+    YamlParseError,
 };
 
 impl<'a> From<&'a str> for Yaml<'a> {
@@ -417,12 +417,6 @@ r"
     }
 )
 );
-
-mk_test!(
-byte input invalid utf8;
-&[0x80, 0xBF, b'-'] => matches bytes std::result::Result::Err(YamlFromBytesError::Utf8Error(..))
-);
-
 
 mk_test!(
 input with seq and dash;
