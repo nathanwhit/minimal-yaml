@@ -458,3 +458,13 @@ r"
  - {to : the parser}
  " => map!{ seq!("this", "is") => seq!( seq!("totally","valid"), "input", map!{"to":"the parser"})}
 );
+
+mk_test!(
+block mapping missing value;
+r"
+a : block
+mapping : missing
+a value for this key:
+
+" => err YamlParseError { line: 5, col: 1, msg: Some("unexpected end of input".into()), source: None}
+);

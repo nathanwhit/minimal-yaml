@@ -174,20 +174,41 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn lookup_line_col(&self) -> (usize, usize) {
-        let err_off: usize = self.token.start().into();
+        let err_off: usize = usize::from(self.token.start())+1;
         let mut off = 0;
-        let mut line_no = 0;
-        for (line_num, line) in self.source.lines().enumerate() {
-            if err_off >= off && err_off <= off + line.len() {
-                return (line_num + 1, err_off - off + 1);
+        let mut line_len = 0;
+        let mut chars = self.source.chars().map(|c| (c, c.len_utf8())); 
+        let mut line_lens = Vec::new();
+        while let Some((chr, len)) = chars.next() {
+            match chr {
+                '\r' => {
+                    if let Some(('\n', nxtlen)) = chars.next() {
+                        line_lens.push(line_len+nxtlen+len);
+                        line_len = 0;
+                        continue;
+                    }
+                }
+                '\n' => {
+                    line_lens.push(line_len+len);
+                    line_len = 0;
+                    continue;
+                }
+                _ => line_len += len
             }
-            off += line.len();
-            line_no += 1;
+        }
+        let mut line_num = 0;
+        for ((line_no, _), len) in self.source.lines().enumerate().zip(line_lens) {
+            if err_off >= off && err_off < off + len {
+                return (line_no + 1, err_off - off + 1);
+            }
+            line_num = line_no;
+            off += len;
         }
         if err_off >= off {
-            return (line_no, err_off - off + 1)
+            return (line_num + 1, err_off - off + 1)
         }
-        panic!("Internal error occurred, please report this issue at https://github.com/nathanwhit/minimal-yaml/issues")
+        eprintln!("Couldn't find error location, please report this bug");
+        return (0, 0);
     }
 
     fn parse_error<T>(&self) -> Result<T> {
