@@ -49,3 +49,10 @@ Of course, sequences and mappings may be nested, and any valid YAML element can 
 ```
 
 In accordance with the crate's goal of minimalism, the public API consists of one main structure: `enum Yaml<'a>` and one main function: `pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>>`
+
+## Performance
+
+***Caveat***:
+*The following is based on fairly limited benchmarking performed on a single machine using inputs of various sizes*
+
+A side benefit of keeping the parser as simple as possible is that *minimal-yaml* performs better than existing, full-featured parsers. In comparison with the fully spec compliant parser [*yaml-rust*](https://github.com/chyhå1990/yaml-rust), *minimal-yaml* consistently performs 3-5x better (i.e. parsing takes 1/3 to 1/5 of the time of *yaml-rust*).
