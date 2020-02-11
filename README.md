@@ -56,3 +56,20 @@ In accordance with the crate's goal of minimalism, the public API consists of on
 *The following is based on fairly limited benchmarking performed on a single machine using inputs of various sizes*
 
 A side benefit of keeping the parser as simple as possible is that *minimal-yaml* performs better than existing, full-featured parsers. In comparison with the fully spec compliant parser [*yaml-rust*](https://github.com/chyhå1990/yaml-rust), *minimal-yaml* consistently performs 3-5x better (i.e. parsing takes 1/3 to 1/5 of the time of *yaml-rust*).
+
+## License
+
+Licensed under either of
+
+* Apache License, Version 2.0
+ ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+* MIT license
+ ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
+
+at your option.
+
+## Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions
