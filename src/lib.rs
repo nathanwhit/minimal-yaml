@@ -104,7 +104,7 @@ impl<'a> Display for Entry<'a> {
 pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
     let tokenizer = Tokenizer::from_str(input);
     let tokens = tokenizer.tokenize();
-    let mut parser = Parser::new(input, &tokens);
+    let mut parser = Parser::new(input, &tokens)?;
     parser.parse()
 }
 

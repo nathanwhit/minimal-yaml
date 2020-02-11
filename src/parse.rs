@@ -26,10 +26,10 @@ pub(crate) struct Parser<'a, 'b> {
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
-    pub(crate) fn new(source: &'a str, tok_stream: &'b [Token<'a>]) -> Self {
+    pub(crate) fn new(source: &'a str, tok_stream: &'b [Token<'a>]) -> Result<Self> {
         let mut stream = tok_stream.iter().enumerate().peekable();
-        let first = stream.next().unwrap();
-        Self {
+        let first = stream.next().ok_or_else(|| YamlParseError{ line: 0, col: 0, msg: Some("expected input".into()), source: None})?;
+        Ok(Self {
             token: &first.1,
             stream,
             tok_stream,
@@ -37,7 +37,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             tok_idx: first.0,
             indent: 0,
             expected: Vec::new(),
-        }
+        })
     }
 
     fn bump(&mut self) -> bool {
