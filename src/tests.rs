@@ -74,22 +74,22 @@ macro_rules! mk_test {
 
 mk_test!(
     double quote scalar whitespace;
-    r#""a scalar value with whitespace""# => Scalar("a scalar value with whitespace")
+    r#""a scalar value with whitespace""# => Scalar(r#""a scalar value with whitespace""#)
 );
 
 mk_test!(
     double quote scalar no whitespace;
-    r#""a_scalarvaluewithout_whitespace""# => Scalar("a_scalarvaluewithout_whitespace")
+    r#""a_scalarvaluewithout_whitespace""# => Scalar(r#""a_scalarvaluewithout_whitespace""#)
 );
 
 mk_test!(
     single quote scalar whitespace;
-    r#"'a scalar value with whitespace'"# => Scalar("a scalar value with whitespace")
+    r#"'a scalar value with whitespace'"# => Scalar(r#"'a scalar value with whitespace'"#)
 );
 
 mk_test!(
     single quote scalar no whitespace;
-    r#"'ascalarvalue_without_whitespace'"# => Scalar("ascalarvalue_without_whitespace")
+    r#"'ascalarvalue_without_whitespace'"# => Scalar(r#"'ascalarvalue_without_whitespace'"#)
 );
 
 mk_test!(
@@ -129,7 +129,7 @@ mk_test!(
 
 mk_test!(
     simple flow sequence mixed quotes;
-    r#"[ "a", 'b' , "  c ", d, ' e  ' ]"# => seq!("a", "b", "  c ", "d", " e  ")
+    r#"[ "a", 'b' , "  c ", d, ' e  ' ]"# => seq!(r#""a""#, r#"'b'"#, r#""  c ""# , "d", r#"' e  '"#)
 );
 
 mk_test!(
@@ -148,7 +148,7 @@ mk_test!(
 
 mk_test!(
     mixed kind flow sequence quotes;
-    r#"[" elem " , [ a, 'b ' , "   c "]]"# => seq!(" elem ", seq!("a", "b ", "   c "))
+    r#"[" elem " , [ a, 'b ' , "   c "]]"# => seq!(r#"" elem ""#, seq!("a", r"'b '", r#""   c ""#))
 );
 
 // Macro
@@ -205,7 +205,7 @@ mk_test!(
 mk_test!(
     map entry flow mapping;
     r"{ { a   map : as a key} : { 'a map ': as a value }   }" => map! {
-        map! { "a   map" : "as a key" } => map! { "a map " : "as a value" } 
+        map! { "a   map" : "as a key" } => map! { r"'a map '" : "as a value" } 
     }
 );
 
@@ -221,7 +221,7 @@ r#"
 -   nodes
 - "in"
 - 'block'
-- ' form '"# => seq!("a", "sequence", "of", "yaml", "nodes", "in", "block", " form ") 
+- ' form '"# => seq!("a", "sequence", "of", "yaml", "nodes", r#""in""#, r"'block'", r"' form '") 
 );
 
 mk_test!(
@@ -231,7 +231,7 @@ r#"
 - sequence
 - with
 -       [ a, sequence, "as ", 'a', node  ]
-"# => seq!("a", "sequence", "with", seq!("a", "sequence", "as ", "a", "node"))
+"# => seq!("a", "sequence", "with", seq!("a", "sequence", r#""as ""#, "'a'", "node"))
 );
 
 mk_test!(
@@ -242,7 +242,7 @@ r#"
 - sequence
 - '  "with" '
 - { a : "flow", mapping : ' as ', a : " 'node' "}
-"# => seq!("a", "block", "sequence", "  \"with\" ", map!{ "a" : "flow", "mapping" : " as ", "a" : " \'node\' "})
+"# => seq!("a", "block", "sequence", r#"'  "with" '"#, map!{ "a" : r#""flow""#, "mapping" : r"' as '", "a" : r#"" 'node' ""#})
 );
 
 mk_test!(
@@ -257,7 +257,7 @@ r#"
   - with
   - two
   - "'e l e m e n t s'"
-"# => seq!(seq!(" a ", " nested", " \" block  \" ","sequence"), seq!("with", "two", "\'e l e m e n t s\'"))
+"# => seq!(seq!(r#"" a ""#, r"' nested'", r#"' " block  " '"# ,"sequence"), seq!("with", "two", r#""'e l e m e n t s'""#))
 );
 
 mk_test!(
@@ -284,8 +284,8 @@ r##"
 "## => 
     seq!(
         seq!(
-            "a",
-            "nested",
+            r#""a""#,
+            r#""nested""#,
             "block",
             seq!(
                 "sequence",
@@ -309,7 +309,7 @@ r##"
                 )
             )
         ),
-        "\' the \'",
+        r#""' the '""#,
         "end"
     )
 );
@@ -324,7 +324,7 @@ key2 : value2
 and : another
 now with : "some quotes"
 'and' : "a 'few' more"
-"# => map!{ "key" : "value", "key2" : "value2", "and" : "another", "now with" : "some quotes", "and" : "a \'few\' more"}
+"# => map!{ "key" : "value", "key2" : "value2", "and" : "another", "now with" : r#""some quotes""#, r"'and'" : r#""a 'few' more""#}
 );
 
 mk_test!(
@@ -335,7 +335,7 @@ mind : blown
 wait : [it, works, with, flow, sequences too]
 [now, how, about, one, with, the, flow, mapping, as] : a key
 "# => map!{
-    "key" => map!{ "the" : " value ", "i s": "a", "flow":"mapping"};
+    "key" => map!{ "the" : r#"" value ""#, r"'i s'": "a", "flow":"mapping"};
     "mind" => "blown";
     "wait" => seq!("it", "works", "with", "flow", "sequences too");
     seq!("now", "how", "about", "one", "with", "the", "flow", "mapping", "as") => "a key"

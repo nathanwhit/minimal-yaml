@@ -143,29 +143,37 @@ impl<'a, 'b> Parser<'a, 'b> {
             // TODO: currently qouble quote/single quote scalars are handled identically. maybe handle as defined
             // by the YAML spec?
             DoubleQuote => {
+                let scal_start = self.tok_idx;
                 self.advance()?;
-                let tok_range = self.take_until(MatchOrErr, |tok, _| matches!(tok, DoubleQuote))?;
-                debug_assert!(matches!(self.token.kind, DoubleQuote));
-                self.bump();
-                let entire_literal = self.slice_tok_range(tok_range);
+                self.take_until(MatchOrErr, |tok, _| matches!(tok, DoubleQuote))?;
+                let scal_end = if self.bump() {
+                    self.tok_idx
+                } else {
+                    self.tok_stream.len()
+                };
+                let entire_literal = self.slice_tok_range((scal_start, scal_end));
                 Ok(Yaml::Scalar(entire_literal))
             }
             SingleQuote => {
-                self.bump();
-                let tok_range = self.take_until(MatchOrErr, |tok, _| matches!(tok, SingleQuote))?;
-                debug_assert!(matches!(self.token.kind, SingleQuote));
-                self.bump();
-                let entire_literal = self.slice_tok_range(tok_range);
+                let scal_start = self.tok_idx;
+                self.advance()?;
+                self.take_until(MatchOrErr, |tok, _| matches!(tok, SingleQuote))?;
+                let scal_end = if self.bump() {
+                    self.tok_idx
+                } else {
+                    self.tok_stream.len()
+                };
+                let entire_literal = self.slice_tok_range((scal_start, scal_end));
                 Ok(Yaml::Scalar(entire_literal))
             }
             Literal(..) => {
                 let stop = |tok: &TokenKind<'_>| {
                     matches!(tok, Comma | Colon | RightBrace | RightBracket | Newline)
                 };
-                let tok_range = self.take_until(MatchOrEnd, |tok, nxt| {
+                let scal_range = self.take_until(MatchOrEnd, |tok, nxt| {
                     stop(tok) || (matches!(tok, Whitespace(..)) && stop(nxt))
                 })?;
-                let entire_literal = self.slice_tok_range(tok_range);
+                let entire_literal = self.slice_tok_range(scal_range);
                 Ok(Yaml::Scalar(entire_literal))
             }
             // TODO: Provide error message
