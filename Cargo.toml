@@ -15,3 +15,6 @@ yaml-rust = "0.4.3"
 [[bench]]
 name = "yaml_bench"
 harness = false
+
+[lib]
+bench = false
