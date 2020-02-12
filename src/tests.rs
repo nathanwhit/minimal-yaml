@@ -462,3 +462,51 @@ a value for this key:
 
 " => err YamlParseError { line: 5, col: 1, msg: Some("unexpected end of input".into()), source: None}
 );
+
+// Round trip
+
+#[test]
+fn test_round_trip_basic_literal_eq() {
+    let input = 
+r#"foo : bar
+baz :
+  - qux
+  - quux
+  -
+    corge : grault
+    garply : waldo
+      - fred
+      - plugh
+      - xyzzy
+    : thud
+"#;
+    assert_eq!(crate::parse(input).unwrap().to_string(), String::from(input))
+}
+
+#[test]
+fn test_round_trip_basic_structural_eq() {
+    let input = 
+r#"
+key : 
+  the : value
+  is : 
+    nested : mappings
+    wow : 
+      - with a block seq
+      - too
+and : done
+"#;
+    assert_eq!(crate::parse(&crate::parse(input).unwrap().to_string()).unwrap(),
+        map!{
+            "key" => map! {
+                "the" => "value";
+                "is" => map! {
+                    "nested" => "mappings";
+                    "wow" => seq!("with a block seq", "too")
+                }
+            };
+            "and" => "done"
+        }
+    )
+}
+
