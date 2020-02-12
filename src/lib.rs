@@ -39,38 +39,102 @@ pub enum Yaml<'a> {
     /// ```
     Mapping(Vec<Entry<'a>>),
 }
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PrintStyle {
+    Block,
+    Flow
+}
+
+fn print_indent(indent: usize, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:indent$}", "", indent=indent)
+}
+
+fn print_yaml(node: &Yaml<'_>, indent: usize, f: &mut fmt::Formatter, style: PrintStyle) -> fmt::Result {
+    const INDENT_AMT: usize = 2;
+    match node {
+        Yaml::Scalar(slice) => {
+            write!(f, "{}", slice)
+        }
+        Yaml::Sequence(seq) => {
+            match style {
+                PrintStyle::Block => {
+                    for el in seq.iter() {
+                        print_indent(indent, f)?;
+                        write!(f, "-")?;
+                        match el {
+                            Yaml::Scalar(slice) => write!(f, " {scal}\n", scal=slice)?,
+                            Yaml::Sequence(..) | Yaml::Mapping(..) => {
+                                write!(f, "\n")?;
+                                print_yaml(el, indent+INDENT_AMT, f, style)?;
+                            },
+                        }
+                    }
+                },
+                PrintStyle::Flow => {
+                    write!(f, "[ ")?;
+                    let last_idx = seq.len() - 1;
+                    for (idx, elem) in seq.iter().enumerate() {
+                        if idx == last_idx {
+                            write!(f, "{}", elem)?;
+                        } else {
+                            write!(f, "{}, ", elem)?;
+                        }
+                    }
+                    write!(f, " ]")?;
+                }
+            }
+            Ok(())
+        }
+        Yaml::Mapping(map) => {
+            match style {
+                PrintStyle::Block => {
+                    for entry in map.iter() {
+                        match &entry.key {
+                            Yaml::Scalar(..) => {
+                                print_indent(indent, f)?;
+                                print_yaml(&entry.key, indent, f, PrintStyle::Block)?;
+                                write!(f, " ")?;
+                            },
+                            Yaml::Sequence(..) | Yaml::Mapping(..) => {
+                                print_yaml(&entry.key, indent+INDENT_AMT, f, PrintStyle::Block)?;
+                                print_indent(indent, f)?;
+                            },
+                        }
+                        write!(f, ":")?;
+                        match &entry.value {
+                            Yaml::Scalar(..) => {
+                                write!(f, " ")?;
+                                print_yaml(&entry.value, indent, f, PrintStyle::Block)?;
+                                write!(f, "\n")?;
+                            },
+                            Yaml::Sequence(..) | Yaml::Mapping(..) => {
+                                write!(f, "\n")?;
+                                print_yaml(&entry.value, indent + INDENT_AMT, f, PrintStyle::Block)?
+                            }
+                        }
+                    }
+                },
+                PrintStyle::Flow => {
+                    write!(f, "{{")?;
+                    let last_idx = map.len() - 1;
+                    for (idx, entry) in map.iter().enumerate() {
+                        if idx == last_idx {
+                            write!(f, "{}", entry)?;
+                        } else {
+                            write!(f, "{}, ", entry)?;
+                        }
+                    }
+                    write!(f, "}}")?;
+                }
+            }
+            Ok(())
+        }
+    }
+}
 
 impl Display for Yaml<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Yaml::Scalar(slice) => {
-                write!(f, "{}", slice)
-            }
-            Yaml::Sequence(seq) => {
-                write!(f, "[ ")?;
-                let last_idx = seq.len() - 1;
-                for (idx, elem) in seq.iter().enumerate() {
-                    if idx == last_idx {
-                        write!(f, "{}", elem)?;
-                    } else {
-                        write!(f, "{}, ", elem)?;
-                    }
-                }
-                write!(f, " ]")
-            }
-            Yaml::Mapping(map) => {
-                write!(f, "{{")?;
-                let last_idx = map.len() - 1;
-                for (idx, entry) in map.iter().enumerate() {
-                    if idx == last_idx {
-                        write!(f, "{}", entry)?;
-                    } else {
-                        write!(f, "{}, ", entry)?;
-                    }
-                }
-                write!(f, " }}")
-            }
-        }
+        print_yaml(&self, 0, f, PrintStyle::Block)
     }
 }
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -92,6 +156,7 @@ impl<'a> Entry<'a> {
 
 impl<'a> Display for Entry<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // match self.key 
         write!(f, "{} : {}", self.key, self.value)
     }
 }
