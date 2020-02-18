@@ -467,8 +467,7 @@ a value for this key:
 
 #[test]
 fn test_round_trip_basic_literal_eq() {
-    let input = 
-r#"foo : bar
+    let input = r#"foo : bar
 baz :
   - qux
   - quux
@@ -480,13 +479,15 @@ baz :
       - xyzzy
     : thud
 "#;
-    assert_eq!(crate::parse(input).unwrap().to_string(), String::from(input))
+    assert_eq!(
+        crate::parse(input).unwrap().to_string(),
+        String::from(input)
+    )
 }
 
 #[test]
 fn test_round_trip_basic_structural_eq() {
-    let input = 
-r#"
+    let input = r#"
 key : 
   the : value
   is : 
@@ -496,8 +497,9 @@ key :
       - too
 and : done
 "#;
-    assert_eq!(crate::parse(&crate::parse(input).unwrap().to_string()).unwrap(),
-        map!{
+    assert_eq!(
+        crate::parse(&crate::parse(input).unwrap().to_string()).unwrap(),
+        map! {
             "key" => map! {
                 "the" => "value";
                 "is" => map! {
@@ -509,4 +511,3 @@ and : done
         }
     )
 }
-

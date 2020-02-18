@@ -28,7 +28,12 @@ pub(crate) struct Parser<'a, 'b> {
 impl<'a, 'b> Parser<'a, 'b> {
     pub(crate) fn new(source: &'a str, tok_stream: &'b [Token<'a>]) -> Result<Self> {
         let mut stream = tok_stream.iter().enumerate().peekable();
-        let first = stream.next().ok_or_else(|| YamlParseError{ line: 0, col: 0, msg: Some("expected input".into()), source: None})?;
+        let first = stream.next().ok_or_else(|| YamlParseError {
+            line: 0,
+            col: 0,
+            msg: Some("expected input".into()),
+            source: None,
+        })?;
         Ok(Self {
             token: &first.1,
             stream,
@@ -64,7 +69,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn at_end(&self) -> bool {
-        self.tok_idx == self.tok_stream.len()-1
+        self.tok_idx == self.tok_stream.len() - 1
     }
 
     fn parse_mapping_maybe(&mut self, node: Yaml<'a>) -> Result<Yaml<'a>> {
@@ -79,7 +84,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             {
                 self.parse_mapping_block(node)
             }
-            _ => Ok(node)
+            _ => Ok(node),
         }
     }
 
@@ -101,7 +106,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             LeftBracket => {
                 let node = self.parse_sequence_flow()?;
                 self.parse_mapping_maybe(node)?
-            },
+            }
             Dash => match self.peek() {
                 Some(Token { kind: Dash, .. }) => {
                     if self.check_ahead_n(2, |tk| matches!(tk, Dash)) {
@@ -182,26 +187,26 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     fn lookup_line_col(&self) -> (usize, usize) {
-        let err_off: usize = usize::from(self.token.start())+1;
+        let err_off: usize = usize::from(self.token.start()) + 1;
         let mut off = 0;
         let mut line_len = 0;
-        let mut chars = self.source.chars().map(|c| (c, c.len_utf8())); 
+        let mut chars = self.source.chars().map(|c| (c, c.len_utf8()));
         let mut line_lens = Vec::new();
         while let Some((chr, len)) = chars.next() {
             match chr {
                 '\r' => {
                     if let Some(('\n', nxtlen)) = chars.next() {
-                        line_lens.push(line_len+nxtlen+len);
+                        line_lens.push(line_len + nxtlen + len);
                         line_len = 0;
                         continue;
                     }
                 }
                 '\n' => {
-                    line_lens.push(line_len+len);
+                    line_lens.push(line_len + len);
                     line_len = 0;
                     continue;
                 }
-                _ => line_len += len
+                _ => line_len += len,
             }
         }
         let mut line_num = 0;
@@ -213,7 +218,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             off += len;
         }
         if err_off >= off {
-            return (line_num + 1, err_off - off + 1)
+            return (line_num + 1, err_off - off + 1);
         }
         eprintln!("Couldn't find error location, please report this bug");
         return (0, 0);
@@ -299,7 +304,9 @@ impl<'a, 'b> Parser<'a, 'b> {
                         }
                         Whitespace(idt) => {
                             self.indent = idt;
-                            if !self.bump() {break;}
+                            if !self.bump() {
+                                break;
+                            }
                         }
                         _ if self.indent < indent || self.at_end() => break,
                         _ => {
@@ -408,7 +415,9 @@ impl<'a, 'b> Parser<'a, 'b> {
                         }
                         Whitespace(idt) => {
                             self.indent = idt;
-                            if !self.bump() { break; }
+                            if !self.bump() {
+                                break;
+                            }
                         }
                         _ if self.indent < indent || self.at_end() => break,
                         Dash => {
@@ -435,7 +444,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 seq.push(node);
                             }
                         }
-                        _ => return self.parse_error()
+                        _ => return self.parse_error(),
                     }
                 }
                 Ok(Yaml::Sequence(seq))

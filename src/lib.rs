@@ -4,7 +4,7 @@ mod parse;
 mod tests;
 mod tokenize;
 
-pub use crate::errors::{YamlParseError};
+pub use crate::errors::YamlParseError;
 
 pub(crate) type Result<T> = std::result::Result<T, YamlParseError>;
 
@@ -42,19 +42,23 @@ pub enum Yaml<'a> {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PrintStyle {
     Block,
-    Flow
+    #[allow(unused)]
+    Flow,
 }
 
 fn print_indent(indent: usize, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:indent$}", "", indent=indent)
+    write!(f, "{:indent$}", "", indent = indent)
 }
 
-fn print_yaml(node: &Yaml<'_>, indent: usize, f: &mut fmt::Formatter, style: PrintStyle) -> fmt::Result {
+fn print_yaml(
+    node: &Yaml<'_>,
+    indent: usize,
+    f: &mut fmt::Formatter,
+    style: PrintStyle,
+) -> fmt::Result {
     const INDENT_AMT: usize = 2;
     match node {
-        Yaml::Scalar(slice) => {
-            write!(f, "{}", slice)
-        }
+        Yaml::Scalar(slice) => write!(f, "{}", slice),
         Yaml::Sequence(seq) => {
             match style {
                 PrintStyle::Block => {
@@ -62,14 +66,14 @@ fn print_yaml(node: &Yaml<'_>, indent: usize, f: &mut fmt::Formatter, style: Pri
                         print_indent(indent, f)?;
                         write!(f, "-")?;
                         match el {
-                            Yaml::Scalar(slice) => write!(f, " {scal}\n", scal=slice)?,
+                            Yaml::Scalar(slice) => write!(f, " {scal}\n", scal = slice)?,
                             Yaml::Sequence(..) | Yaml::Mapping(..) => {
                                 write!(f, "\n")?;
-                                print_yaml(el, indent+INDENT_AMT, f, style)?;
-                            },
+                                print_yaml(el, indent + INDENT_AMT, f, style)?;
+                            }
                         }
                     }
-                },
+                }
                 PrintStyle::Flow => {
                     write!(f, "[ ")?;
                     let last_idx = seq.len() - 1;
@@ -94,11 +98,11 @@ fn print_yaml(node: &Yaml<'_>, indent: usize, f: &mut fmt::Formatter, style: Pri
                                 print_indent(indent, f)?;
                                 print_yaml(&entry.key, indent, f, PrintStyle::Block)?;
                                 write!(f, " ")?;
-                            },
+                            }
                             Yaml::Sequence(..) | Yaml::Mapping(..) => {
-                                print_yaml(&entry.key, indent+INDENT_AMT, f, PrintStyle::Block)?;
+                                print_yaml(&entry.key, indent + INDENT_AMT, f, PrintStyle::Block)?;
                                 print_indent(indent, f)?;
-                            },
+                            }
                         }
                         write!(f, ":")?;
                         match &entry.value {
@@ -106,14 +110,14 @@ fn print_yaml(node: &Yaml<'_>, indent: usize, f: &mut fmt::Formatter, style: Pri
                                 write!(f, " ")?;
                                 print_yaml(&entry.value, indent, f, PrintStyle::Block)?;
                                 write!(f, "\n")?;
-                            },
+                            }
                             Yaml::Sequence(..) | Yaml::Mapping(..) => {
                                 write!(f, "\n")?;
                                 print_yaml(&entry.value, indent + INDENT_AMT, f, PrintStyle::Block)?
                             }
                         }
                     }
-                },
+                }
                 PrintStyle::Flow => {
                     write!(f, "{{")?;
                     let last_idx = map.len() - 1;
@@ -156,7 +160,7 @@ impl<'a> Entry<'a> {
 
 impl<'a> Display for Entry<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // match self.key 
+        // match self.key
         write!(f, "{} : {}", self.key, self.value)
     }
 }
