@@ -69,8 +69,9 @@ fn print_yaml(
                         print_indent(indent, f)?;
                         write!(f, "-")?;
                         match el {
-                            Yaml::Scalar(slice) => write!(f, " {scal}\n", scal = slice)?,
+                            Yaml::Scalar(slice) => writeln!(f, " {scal}", scal = slice)?,
                             Yaml::Sequence(..) | Yaml::Mapping(..) => {
+                                #[allow(clippy::write_with_newline)]
                                 write!(f, "\n")?;
                                 print_yaml(el, indent + INDENT_AMT, f, style)?;
                             }
@@ -112,9 +113,11 @@ fn print_yaml(
                             Yaml::Scalar(..) => {
                                 write!(f, " ")?;
                                 print_yaml(&entry.value, indent, f, PrintStyle::Block)?;
+                                #[allow(clippy::write_with_newline)]
                                 write!(f, "\n")?;
                             }
                             Yaml::Sequence(..) | Yaml::Mapping(..) => {
+                                #[allow(clippy::write_with_newline)]
                                 write!(f, "\n")?;
                                 print_yaml(&entry.value, indent + INDENT_AMT, f, PrintStyle::Block)?
                             }
