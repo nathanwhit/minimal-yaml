@@ -1,4 +1,5 @@
 #![cfg(test)]
+#![allow(clippy::pedantic)]
 
 use crate::{
     parse, Entry, Yaml,
@@ -102,8 +103,6 @@ mk_test!(
     "anunquoted_scalar_value_withoutwhitespace" => Scalar("anunquoted_scalar_value_withoutwhitespace")
 );
 
-use Scalar as S;
-
 macro_rules! seq {
     ($($val: expr),*) => {
         Sequence(vec![$( $val.into() ),*])
@@ -177,14 +176,14 @@ mk_test!(
 mk_test!(
     seq value flow mapping;
     r"{ k1 : [ a , b, c] }" => map! {
-        S("k1") => seq!("a", "b", "c")
+        "k1" => seq!("a", "b", "c")
     }
 );
 
 mk_test!(
     seq key flow mapping;
     r"{ [ a, map, as a key ] : val }" => map! {
-        seq!("a", "map", "as a key") => S("val")
+        seq!("a", "map", "as a key") => "val"
     }
 );
 
@@ -198,7 +197,7 @@ mk_test!(
 mk_test!(
     map key flow mapping;
     r"{ { a map : as a key} : value }" => map! {
-        map! { "a map" : "as a key" } => S("value")
+        map! { "a map" : "as a key" } => "value"
     }
 );
 

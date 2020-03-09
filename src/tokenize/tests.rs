@@ -1,4 +1,5 @@
 #![cfg(test)]
+#![allow(clippy::pedantic)]
 use super::*;
 use TokenKind::*;
 

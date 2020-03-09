@@ -221,7 +221,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             return (line_num + 1, err_off - off + 1);
         }
         eprintln!("Couldn't find error location, please report this bug");
-        return (0, 0);
+        (0, 0)
     }
 
     fn parse_error<T>(&self) -> Result<T> {
