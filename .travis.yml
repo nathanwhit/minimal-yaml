@@ -6,5 +6,9 @@ rust:
 jobs:
   allow_failures:
     - rust: nightly
+    - rust: beta
+      if: branch = test_suite
+    - rust: stable
+      if: branch = test_suite
   fast_finish: true
 cache: cargo
