@@ -10,3 +10,4 @@ serde = {version = "1.0.104", features = ['derive'], optional = true}
 
 [dev-dependencies]
 paste = "0.1.6"
+serde = {version = "1.0.104", features = ["derive"]}
