@@ -12,7 +12,7 @@ use parse::Parser;
 use tokenize::Tokenizer;
 
 use std::{fmt, fmt::Display};
-#[cfg_attr(test, derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "suite", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// A Yaml Element
 pub enum Yaml<'a> {
@@ -144,15 +144,15 @@ impl Display for Yaml<'_> {
         print_yaml(&self, 0, f, PrintStyle::Block)
     }
 }
-#[cfg_attr(test, derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "suite", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// A Yaml map entry
 pub struct Entry<'a> {
     /// The key associated with the entry
-    #[cfg_attr(test, serde(borrow))]
+    #[cfg_attr(feature = "suite", serde(borrow))]
     pub key: Yaml<'a>,
     /// The value which the key maps to
-    #[cfg_attr(test, serde(borrow))]
+    #[cfg_attr(feature = "suite", serde(borrow))]
     pub value: Yaml<'a>,
 }
 

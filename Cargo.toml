@@ -10,9 +10,13 @@ repository = "https://github.com/nathanwhit/minimal-yaml/"
 homepage = "https://github.com/nathanwhit/minimal-yaml/"
 
 [dependencies]
+serde = {version = "1.0.104", features = ["derive"], optional = true}
 
 [dev-dependencies]
 paste = "0.1.6"
-testgen-minimal-yaml = {git = "https://github.com/nathanwhit/testgen-minimal-yaml"}
-serde = {version = "1.0.104", features = ["derive"]}
+testgen-minimal-yaml = {path = "/Users/nathanw/Documents/Projects/testgen-minimal-yaml"}
 serde_json = "1.0.48"
+
+[features]
+suite = ["serde"]
+default = []
