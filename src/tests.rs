@@ -512,4 +512,4 @@ and : done
     )
 }
 
-testgen_minimal_yaml::yaml_test_gen!("/Users/nathanw/Documents/Projects/yaml-test-suite");
+testgen_minimal_yaml::yaml_test_gen!("./yaml-test-suite");
