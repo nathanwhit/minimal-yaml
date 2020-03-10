@@ -360,9 +360,9 @@ impl<'a> Tokenizer<'a> {
                 '\t' | ' ' => {
                     let tok = self.consume_whitespace(&chr);
                     self.push_tok(tok);
-                }
-                '#' => {
-                    self.consume_until(&chr, |c| c == '\n');
+                    if let Some(next_chr @ SourceChar { value: '#', .. }) = self.peek() {
+                        self.consume_until(&next_chr, |c| c == '\n');
+                    }
                 }
                 _ => {
                     if let Token {
