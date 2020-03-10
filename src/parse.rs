@@ -14,6 +14,14 @@ macro_rules! matches {
         }
     }
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParseContext {
+    Scalar,
+    FlowMapping,
+    FlowSequence,
+    Sequence,
+    Mapping,
+}
 
 pub(crate) struct Parser<'a, 'b> {
     token: &'b Token<'a>,
@@ -23,6 +31,7 @@ pub(crate) struct Parser<'a, 'b> {
     tok_idx: usize,
     indent: usize,
     expected: Vec<TokenKind<'a>>,
+    contexts: Vec<ParseContext>,
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
@@ -42,7 +51,34 @@ impl<'a, 'b> Parser<'a, 'b> {
             tok_idx: first.0,
             indent: 0,
             expected: Vec::new(),
+            contexts: Vec::new(),
         })
+    }
+
+    fn context(&self) -> Option<&ParseContext> {
+        self.contexts.last()
+    }
+
+    fn start_context(&mut self, context: ParseContext) {
+        self.contexts.push(context)
+    }
+
+    fn end_context(&mut self, expect: ParseContext) -> Result<()> {
+        if let Some(actual) = self.contexts.pop() {
+            if actual == expect {
+                Ok(())
+            } else {
+                self.parse_error_with_msg(format!(
+                    "expected but failed to end context {:?}, instead found {:?}",
+                    expect, actual
+                ))
+            }
+        } else {
+            self.parse_error_with_msg(format!(
+                "expected context {:?} but no contexts remained",
+                expect
+            ))
+        }
     }
 
     fn bump(&mut self) -> bool {
@@ -144,6 +180,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     pub(crate) fn parse_scalar(&mut self) -> Result<Yaml<'a>> {
         use TakeUntilCond::*;
         use TokenKind::*;
+        self.start_context(ParseContext::Scalar);
         match self.token.kind {
             // TODO: currently qouble quote/single quote scalars are handled identically. maybe handle as defined
             // by the YAML spec?
@@ -157,6 +194,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                     self.tok_stream.len()
                 };
                 let entire_literal = self.slice_tok_range((scal_start, scal_end));
+                self.end_context(ParseContext::Scalar)?;
                 Ok(Yaml::Scalar(entire_literal))
             }
             SingleQuote => {
@@ -169,6 +207,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                     self.tok_stream.len()
                 };
                 let entire_literal = self.slice_tok_range((scal_start, scal_end));
+                self.end_context(ParseContext::Scalar)?;
                 Ok(Yaml::Scalar(entire_literal))
             }
             Literal(..) => {
@@ -179,6 +218,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                     stop(tok) || (matches!(tok, Whitespace(..)) && stop(nxt))
                 })?;
                 let entire_literal = self.slice_tok_range(scal_range);
+                self.end_context(ParseContext::Scalar)?;
                 Ok(Yaml::Scalar(entire_literal))
             }
             // TODO: Provide error message
@@ -246,6 +286,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub(crate) fn parse_mapping_flow(&mut self) -> Result<Yaml<'a>> {
         use TokenKind::*;
+        self.start_context(ParseContext::FlowMapping);
         match self.token.kind {
             LeftBrace => (),
             _ => return self.parse_error_with_msg("expected left brace"),
@@ -256,6 +297,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             match self.token.kind {
                 RightBrace => {
                     self.bump();
+                    self.end_context(ParseContext::FlowMapping)?;
                     return Ok(Yaml::Mapping(entries));
                 }
                 Comma => {
@@ -284,6 +326,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub(crate) fn parse_mapping_block(&mut self, start_key: Yaml<'a>) -> Result<Yaml<'a>> {
         use TokenKind::*;
+        self.start_context(ParseContext::Mapping);
         let indent = self.indent;
         match self.token.kind {
             Colon => {
@@ -326,6 +369,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                         }
                     }
                 }
+                self.end_context(ParseContext::Mapping)?;
                 Ok(Yaml::Mapping(entries))
             }
             // TODO: Provide error message
@@ -352,6 +396,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub(crate) fn parse_sequence_flow(&mut self) -> Result<Yaml<'a>> {
         use TokenKind::*;
+        self.start_context(ParseContext::FlowSequence);
         match self.token.kind {
             LeftBracket => {
                 self.advance()?;
@@ -360,6 +405,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                     match self.token.kind {
                         RightBracket => {
                             self.bump();
+                            self.end_context(ParseContext::FlowSequence)?;
                             return Ok(Yaml::Sequence(elements));
                         }
                         Whitespace(..) => {
@@ -376,6 +422,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 }
                                 RightBracket => {
                                     self.bump();
+                                    self.end_context(ParseContext::FlowSequence)?;
                                     return Ok(Yaml::Sequence(elements));
                                 }
                                 // TODO: Provide error message
@@ -399,6 +446,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub(crate) fn parse_sequence_block(&mut self) -> Result<Yaml<'a>> {
         use TokenKind::*;
+        self.start_context(ParseContext::Sequence);
         let indent = self.indent;
         match self.token.kind {
             Dash => {
@@ -447,6 +495,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                         _ => return self.parse_error(),
                     }
                 }
+                self.end_context(ParseContext::Sequence)?;
                 Ok(Yaml::Sequence(seq))
             }
             // TODO: Provide error message
