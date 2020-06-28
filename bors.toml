@@ -1,1 +1,1 @@
-status = [ "CI/Test%" ]
+status = [ "Test%", "Format" ]
