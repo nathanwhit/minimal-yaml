@@ -133,7 +133,7 @@ mk_test!(
 
 mk_test!(
     multiple flow sequence no quotes;
-    r"[[ a, b, c ,d, e   ] , [ f, g, h, i , j ]]" => 
+    r"[[ a, b, c ,d, e   ] , [ f, g, h, i , j ]]" =>
         seq!(
             seq!("a", "b","c", "d", "e"),
             seq!("f", "g", "h", "i", "j")
@@ -204,7 +204,7 @@ mk_test!(
 mk_test!(
     map entry flow mapping;
     r"{ { a   map : as a key} : { 'a map ': as a value }   }" => map! {
-        map! { "a   map" : "as a key" } => map! { r"'a map '" : "as a value" } 
+        map! { "a   map" : "as a key" } => map! { r"'a map '" : "as a value" }
     }
 );
 
