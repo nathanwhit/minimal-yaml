@@ -13,7 +13,7 @@ use tokenize::Tokenizer;
 
 use std::{fmt, fmt::Display};
 #[cfg_attr(
-    any(test, feature = "serde"),
+    test,
     derive(serde::Deserialize, serde::Serialize)
 )]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -148,17 +148,17 @@ impl Display for Yaml<'_> {
     }
 }
 #[cfg_attr(
-    any(test, feature = "serde"),
+    test,
     derive(serde::Deserialize, serde::Serialize)
 )]
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// A Yaml map entry
 pub struct Entry<'a> {
     /// The key associated with the entry
-    #[cfg_attr(any(test, feature = "serde"), serde(borrow))]
+    #[cfg_attr(test, serde(borrow))]
     pub key: Yaml<'a>,
     /// The value which the key maps to
-    #[cfg_attr(any(test, feature = "serde"), serde(borrow))]
+    #[cfg_attr(test, serde(borrow))]
     pub value: Yaml<'a>,
 }
 
