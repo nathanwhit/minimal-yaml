@@ -405,7 +405,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                             return Ok(Yaml::Sequence(elements));
                         }
                         Whitespace(..) => {
-                            self.bump();
+                            self.advance()?;
                         }
                         _ => {
                             let elem = self.parse()?;
