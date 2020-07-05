@@ -18,8 +18,8 @@ macro_rules! mk_test {
         paste::item! {
             #[test]
             fn [<test_parse_$($name _)+>] () {
-                const INPUT: &str = $inp;
-                assert_eq!(parse(INPUT).unwrap(), $exp);
+                let input: &str = $inp;
+                assert_eq!(parse(input).unwrap(), $exp);
             }
         }
     };
@@ -27,8 +27,8 @@ macro_rules! mk_test {
         paste::item! {
             #[test]
             fn [<test_parse_$($name _)+>] () {
-                const INPUT: &str = $inp;
-                assert_eq!(parse(INPUT).unwrap_err(), $exp);
+                let input: &str = $inp;
+                assert_eq!(parse(input).unwrap_err(), $exp);
             }
         }
     };
@@ -36,9 +36,9 @@ macro_rules! mk_test {
         paste::item! {
             #[test]
             fn [<test_parse_$($name _)+>] () {
-                const INPUT: &[u8] = $inp;
+                let input: &[u8] = $inp;
                 assert!(
-                    match try_parse_from_utf8(INPUT) {
+                    match try_parse_from_utf8(input) {
                         $exp => true,
                         _ => false,
                     }
@@ -50,9 +50,9 @@ macro_rules! mk_test {
         paste::item! {
             #[test]
             fn [<test_parse_$($name _)+>] () {
-                const INPUT: &str = $inp;
+                let input: &str = $inp;
                 assert!(
-                    match parse(INPUT) {
+                    match parse(input) {
                         $exp => true,
                         _ => false,
                     }
@@ -64,8 +64,8 @@ macro_rules! mk_test {
         paste::item! {
             #[test]
             fn [<test_parse_$($name _)+>] () {
-                const INPUT: &str = $inp;
-                assert_eq!(parse(INPUT).unwrap_err().to_string(), $exp);
+                let input: &str = $inp;
+                assert_eq!(parse(input).unwrap_err().to_string(), $exp);
             }
         }
     };
@@ -396,6 +396,11 @@ error msg;
 r#"
 {key: value, missing : }
 "# => err msg r#"error occurred parsing the input at line 2, column 25 : unexpected symbol '}'"#
+);
+
+mk_test!(
+infinite loop;
+std::str::from_utf8(&[45, 49, 58, 91, 32]).unwrap() => err YamlParseError{ line: 1, col: 6, msg: Some(String::from(r#"unexpected end of input"#)), source: None }
 );
 
 mk_test!(
