@@ -55,10 +55,6 @@ impl<'a, 'b> Parser<'a, 'b> {
         })
     }
 
-    fn context(&self) -> Option<&ParseContext> {
-        self.contexts.last()
-    }
-
     fn start_context(&mut self, context: ParseContext) {
         self.contexts.push(context)
     }
