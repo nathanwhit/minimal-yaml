@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Nathan Whitaker <nathan.whitaker01@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
+description = "A minimalist, zero-copy parser for a strict subset of the YAML specification."
+readme = "README.md"
+repository = "https://github.com/nathanwhit/minimal-yaml/"
+homepage = "https://github.com/nathanwhit/minimal-yaml/"
 
 [dependencies]
 
