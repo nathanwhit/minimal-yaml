@@ -142,7 +142,6 @@ pub(crate) enum TokenKind<'a> {
     Colon,
     Comma,
     Dash,
-    Dot,
     Fold,
     Newline,
     LeftBrace,
@@ -153,7 +152,38 @@ pub(crate) enum TokenKind<'a> {
     RightBracket,
     SingleQuote,
     DoubleQuote,
+    QuestionMark,
     Dummy,
+}
+
+impl<'a> TokenKind<'a> {
+    #[allow(unused)]
+    pub fn is_indicator(&self) -> bool {
+        use TokenKind::*;
+        matches!(
+            self,
+            Colon
+                | Comma
+                | Dash
+                | LeftBrace
+                | LeftBracket
+                | Pipe
+                | RightBrace
+                | RightBracket
+                | SingleQuote
+                | DoubleQuote
+                | QuestionMark
+        )
+    }
+
+    #[allow(unused)]
+    pub fn is_flow_indicator(&self) -> bool {
+        use TokenKind::*;
+        matches!(
+            self,
+            Comma | LeftBracket | LeftBrace | RightBracket | RightBrace
+        )
+    }
 }
 
 impl<'a> fmt::Display for TokenKind<'a> {
@@ -170,7 +200,6 @@ impl<'a> fmt::Display for TokenKind<'a> {
                 Colon => ":",
                 Comma => ",",
                 Dash => "-",
-                Dot => ".",
                 Fold => ">",
                 LeftBrace => "{",
                 LeftBracket => "[",
@@ -181,6 +210,7 @@ impl<'a> fmt::Display for TokenKind<'a> {
                 RightBracket => "]",
                 SingleQuote => r"'",
                 DoubleQuote => r#"""#,
+                QuestionMark => "?",
                 Dummy => "DUMMY",
             }
         )
@@ -321,10 +351,18 @@ impl<'a> Tokenizer<'a> {
                 b':' => self.push_tok_with(Colon, chr.span(self.idx)),
                 b',' => self.push_tok_with(Comma, chr.span(self.idx)),
                 b'-' => self.push_tok_with(Dash, chr.span(self.idx)),
-                b'.' => self.push_tok_with(Dot, chr.span(self.idx)),
                 b'\"' => self.push_tok_with(DoubleQuote, chr.span(self.idx)),
                 b'>' => self.push_tok_with(Fold, chr.span(self.idx)),
-                b'\n' | b'\r' => self.push_tok_with(Newline, chr.span(self.idx)),
+                b'\n' => self.push_tok_with(Newline, chr.span(self.idx)),
+                b'\r' => {
+                    let span = match self.peek() {
+                        Some(nc @ b'\n') => {
+                            Span::new(chr.span(self.idx).start, nc.span(self.idx + 1).end)
+                        }
+                        _ => chr.span(self.idx),
+                    };
+                    self.push_tok_with(Newline, span);
+                }
                 b'{' => self.push_tok_with(LeftBrace, chr.span(self.idx)),
                 b'[' => self.push_tok_with(LeftBracket, chr.span(self.idx)),
                 b'|' => self.push_tok_with(Pipe, chr.span(self.idx)),
@@ -332,6 +370,7 @@ impl<'a> Tokenizer<'a> {
                 b'}' => self.push_tok_with(RightBrace, chr.span(self.idx)),
                 b']' => self.push_tok_with(RightBracket, chr.span(self.idx)),
                 b'\'' => self.push_tok_with(SingleQuote, chr.span(self.idx)),
+                b'?' => self.push_tok_with(QuestionMark, chr.span(self.idx)),
                 b'\t' | b' ' => {
                     let tok = self.consume_whitespace();
                     self.push_tok(tok);
