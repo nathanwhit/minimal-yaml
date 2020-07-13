@@ -212,20 +212,20 @@ impl<'a, 'b> Parser<'a, 'b> {
                 Ok(Yaml::Scalar(entire_literal))
             }
             Literal(..) => {
-                let stop = match context {
+                let stop: Box<dyn Fn(&TokenKind<'_>, &TokenKind<'_>) -> bool> = match context {
                     Some(ctx) => match ctx {
                         ParseContext::FlowSequence | ParseContext::FlowMapping => {
-                            |tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
+                            Box::new(|tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
                                 tok.is_flow_indicator()
                                     || (tok.is_indicator()
                                         && matches!(nxt, TokenKind::Whitespace(..)))
                                     || (matches!(tok, TokenKind::Whitespace(..))
                                         && (nxt.is_indicator()
                                             || matches!(tok, TokenKind::Newline)))
-                            }
+                            })
                         }
                         ParseContext::Mapping | ParseContext::Sequence | ParseContext::Scalar => {
-                            |tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
+                            Box::new(|tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
                                 (tok.is_indicator()
                                     && matches!(
                                         nxt,
@@ -235,16 +235,16 @@ impl<'a, 'b> Parser<'a, 'b> {
                                     || (matches!(tok, TokenKind::Whitespace(..))
                                         && (nxt.is_indicator()
                                             || matches!(tok, TokenKind::Newline)))
-                            }
+                            })
                         }
                     },
-                    None => |tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
+                    None => Box::new(|tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
                         (tok.is_indicator()
                             && matches!(nxt, TokenKind::Whitespace(..) | TokenKind::Newline))
                             || matches!(tok, TokenKind::Newline)
                             || (matches!(tok, TokenKind::Whitespace(..))
                                 && (nxt.is_indicator() || matches!(tok, TokenKind::Newline)))
-                    },
+                    }),
                 };
                 let scal_range = self.take_until(MatchOrEnd, stop)?;
                 let entire_literal = self.slice_tok_range(scal_range);
