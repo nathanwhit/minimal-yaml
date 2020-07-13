@@ -400,7 +400,7 @@ r#"
 
 mk_test!(
 infinite loop;
-std::str::from_utf8(&[45, 49, 58, 91, 32]).unwrap() => err YamlParseError{ line: 1, col: 6, msg: Some(String::from(r#"unexpected end of input"#)), source: None }
+std::str::from_utf8(&[45, 49, 58, 91, 32]).unwrap() => err YamlParseError{ line: 1, col: 5, msg: Some(String::from(r#"unexpectedly found "[" while parsing"#)), source: None }
 );
 
 mk_test!(
@@ -473,7 +473,7 @@ r"
 stuff:
     - this::thing::with::colons::and::all-these-other-indicator-characters-:used:-in--an:unquoted:::::::string
 
-" => err YamlParseError { line: 5, col: 1, msg: Some("unexpected end of input".into()), source: None}
+" => map! { "stuff" => seq!("this::thing::with::colons::and::all-these-other-indicator-characters-:used:-in--an:unquoted:::::::string")}
 );
 
 // Round trip
