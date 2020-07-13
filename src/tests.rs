@@ -467,6 +467,15 @@ a value for this key:
 " => err YamlParseError { line: 5, col: 1, msg: Some("unexpected end of input".into()), source: None}
 );
 
+mk_test!(
+input with indicators;
+r"
+stuff:
+    - this::thing::with::colons::and::all-these-other-indicator-characters-:used:-in--an:unquoted:::::::string
+
+" => err YamlParseError { line: 5, col: 1, msg: Some("unexpected end of input".into()), source: None}
+);
+
 // Round trip
 
 #[test]
