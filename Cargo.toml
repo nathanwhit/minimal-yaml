@@ -1,6 +1,6 @@
 [package]
 name = "minimal-yaml"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Nathan Whitaker <nathan.whitaker01@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
