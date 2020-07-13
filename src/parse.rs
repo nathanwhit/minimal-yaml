@@ -77,6 +77,10 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
+    fn context(&self) -> Option<ParseContext> {
+        self.contexts.last().map(|&c| c)
+    }
+
     fn bump(&mut self) -> bool {
         match self.stream.next() {
             Some(tok) => {
@@ -176,6 +180,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     pub(crate) fn parse_scalar(&mut self) -> Result<Yaml<'a>> {
         use TakeUntilCond::*;
         use TokenKind::*;
+        let context = self.context();
         self.start_context(ParseContext::Scalar);
         match self.token.kind {
             // TODO: currently qouble quote/single quote scalars are handled identically. maybe handle as defined
@@ -207,18 +212,50 @@ impl<'a, 'b> Parser<'a, 'b> {
                 Ok(Yaml::Scalar(entire_literal))
             }
             Literal(..) => {
-                let stop = |tok: &TokenKind<'_>| {
-                    matches!(tok, Comma | Colon | RightBrace | RightBracket | Newline)
+                let stop = match context {
+                    Some(ctx) => match ctx {
+                        ParseContext::FlowSequence | ParseContext::FlowMapping => {
+                            |tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
+                                tok.is_flow_indicator()
+                                    || (tok.is_indicator()
+                                        && matches!(nxt, TokenKind::Whitespace(..)))
+                                    || (matches!(tok, TokenKind::Whitespace(..))
+                                        && (nxt.is_indicator()
+                                            || matches!(tok, TokenKind::Newline)))
+                            }
+                        }
+                        ParseContext::Mapping | ParseContext::Sequence | ParseContext::Scalar => {
+                            |tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
+                                (tok.is_indicator()
+                                    && matches!(
+                                        nxt,
+                                        TokenKind::Whitespace(..) | TokenKind::Newline
+                                    ))
+                                    || matches!(tok, TokenKind::Newline)
+                                    || (matches!(tok, TokenKind::Whitespace(..))
+                                        && (nxt.is_indicator()
+                                            || matches!(tok, TokenKind::Newline)))
+                            }
+                        }
+                    },
+                    None => |tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
+                        (tok.is_indicator()
+                            && matches!(nxt, TokenKind::Whitespace(..) | TokenKind::Newline))
+                            || matches!(tok, TokenKind::Newline)
+                            || (matches!(tok, TokenKind::Whitespace(..))
+                                && (nxt.is_indicator() || matches!(tok, TokenKind::Newline)))
+                    },
                 };
-                let scal_range = self.take_until(MatchOrEnd, |tok, nxt| {
-                    stop(tok) || (matches!(tok, Whitespace(..)) && stop(nxt))
-                })?;
+                let scal_range = self.take_until(MatchOrEnd, stop)?;
                 let entire_literal = self.slice_tok_range(scal_range);
                 self.end_context(ParseContext::Scalar)?;
                 Ok(Yaml::Scalar(entire_literal))
             }
             // TODO: Provide error message
-            _ => self.parse_error(),
+            _ => self.parse_error_with_msg(format!(
+                r#"unexpectedly found "{}" when parsing scalar"#,
+                self.token.kind
+            )),
         }
     }
 
@@ -265,7 +302,10 @@ impl<'a, 'b> Parser<'a, 'b> {
         Err(YamlParseError {
             line,
             col,
-            msg: None,
+            msg: Some(format!(
+                r#"unexpectedly found "{}" while parsing"#,
+                self.token.kind
+            )),
             source: None,
         })
     }
