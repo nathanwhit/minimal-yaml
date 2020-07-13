@@ -1,6 +1,9 @@
 use core::fmt;
 use core::iter::{Iterator, Peekable};
+use core::mem;
 use core::ops::Add;
+use core::str::Bytes;
+
 mod tests;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ByteIdx(usize);
@@ -93,6 +96,43 @@ impl Add<ByteLen> for ByteLen {
         ByteLen(self.0 + rhs.0)
     }
 }
+
+trait ByteExt {
+    fn is_indicator(self) -> bool;
+    fn is_linebreak(self) -> bool;
+    fn span(self, pos: impl Into<ByteIdx>) -> Span;
+}
+
+impl ByteExt for u8 {
+    fn is_indicator(self) -> bool {
+        match self {
+            b'-' | b'?' | b':' | b',' | b'[' | b']' | b'{' | b'}' | b'#' | b'&' | b'*' | b'!'
+            | b'|' | b'>' | b'\"' | b'\'' | b'%' | b'@' | b'`' => true,
+            _ => false,
+        }
+    }
+    fn is_linebreak(self) -> bool {
+        self == b'\n' || self == b'\r'
+    }
+    fn span(self, pos: impl Into<ByteIdx>) -> Span {
+        let pos = pos.into();
+        Span {
+            start: ByteIdx(pos.0 - 1),
+            end: pos,
+        }
+    }
+}
+
+trait UsizeExt {
+    fn to(self, other: usize) -> Span;
+}
+
+impl UsizeExt for usize {
+    fn to(self, other: usize) -> Span {
+        ByteIdx(self).to(ByteIdx(other))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TokenKind<'a> {
     Literal(&'a str),
@@ -182,63 +222,30 @@ impl<'a> Token<'a> {
     }
 }
 
-use core::str::CharIndices;
-
 pub(crate) struct Tokenizer<'a> {
     source: &'a str,
-    chars: Peekable<CharIndices<'a>>,
+    bytes: Peekable<Bytes<'a>>,
     tokens: Vec<Token<'a>>,
+    idx: usize,
+    current: Option<u8>,
 }
 
 impl<'a> Tokenizer<'a> {
     pub fn from_str(raw: &'a str) -> Self {
+        let mut bytes = raw.bytes().peekable();
+        let current = bytes.next();
         Self {
-            chars: raw.char_indices().peekable(),
+            bytes,
             source: raw,
             tokens: Vec::new(),
+            idx: 0,
+            current,
         }
     }
 
     #[allow(unused)]
     pub fn new(raw: &'a str) -> Self {
         Self::from_str(raw)
-    }
-}
-#[derive(Debug, Clone)]
-struct SourceChar {
-    idx: ByteIdx,
-    value: char,
-}
-
-impl SourceChar {
-    /// Returns the length, in bytes, of the character.
-    fn len(&self) -> ByteLen {
-        ByteLen(self.value.len_utf8())
-    }
-
-    /// Returns the span of the character. The span begins at
-    /// the characters byte index and ends at the byte index + byte length.
-    fn span(&self) -> Span {
-        Span {
-            start: self.idx,
-            end: self.idx + self.len(),
-        }
-    }
-
-    fn end(&self) -> ByteIdx {
-        self.idx + self.len()
-    }
-}
-
-impl<T> From<T> for SourceChar
-where
-    T: std::borrow::Borrow<(usize, char)>,
-{
-    fn from(other: T) -> Self {
-        Self {
-            idx: ByteIdx(other.borrow().0),
-            value: other.borrow().1,
-        }
     }
 }
 
@@ -256,119 +263,87 @@ impl<'a> SourceStr<'a> {
 impl<'a> Tokenizer<'a> {
     /// Returns the next character, if one exists, without advancing
     /// the source position.
-    fn peek(&mut self) -> Option<SourceChar> {
-        self.chars.peek().map(SourceChar::from)
+    #[allow(unused)]
+    fn peek(&mut self) -> Option<u8> {
+        self.bytes.peek().map(|&b| b)
     }
 
     /// Returns the next character, if one exists, and advances
     /// the source position.
-    fn next_char(&mut self) -> Option<SourceChar> {
-        self.chars.next().map(SourceChar::from)
+    fn next(&mut self) -> Option<u8> {
+        self.idx += 1;
+        let next = self.bytes.next();
+        mem::replace(&mut self.current, next)
     }
 
     /// Advances the source position by one character. Returns `false`
     /// if the source is exhausted, `true` otherwise.
     fn advance(&mut self) -> bool {
-        self.chars.next().is_some()
+        self.next().is_some()
     }
 
-    fn consume_whitespace(&mut self, start: &SourceChar) -> Token<'a> {
-        let SourceStr { slice, span } =
-            self.consume_matches(start, |chr| chr == ' ' || chr == '\t');
+    fn consume_whitespace(&mut self) -> Token<'a> {
+        let SourceStr { slice, span } = self.consume_matches(|chr| chr == b' ' || chr == b'\t');
         Token::new(TokenKind::Whitespace(slice.len()), span)
     }
 
-    fn consume_literal(&mut self, start: &SourceChar) -> Token<'a> {
-        let SourceStr { slice, span } = self.consume_matches(start, |chr| {
-            chr.is_alphanumeric() || chr == '.' || chr == '_'
-        });
+    fn consume_literal(&mut self) -> Token<'a> {
+        let SourceStr { slice, span } =
+            self.consume_matches(|chr| !(chr.is_indicator() || chr.is_ascii_whitespace()));
         Token::new(TokenKind::Literal(slice), span)
     }
 
-    fn consume_matches(
-        &mut self,
-        start: &SourceChar,
-        matches: impl Fn(char) -> bool,
-    ) -> SourceStr<'a> {
-        let tok_start = start.idx;
-        let mut tok_end = start.end();
+    fn consume_matches(&mut self, matches: impl Fn(u8) -> bool) -> SourceStr<'a> {
+        let tok_start = self.idx - 1;
+        let mut tok_end = tok_start + 1;
         loop {
-            match self.peek() {
-                Some(chr) if matches(chr.value) => {
-                    tok_end = chr.end();
+            match self.current {
+                Some(chr) if matches(chr) => {
+                    tok_end += 1;
                     self.advance();
                 }
                 _ => {
-                    return SourceStr::new(
-                        &self.source[tok_start.into()..tok_end.into()],
-                        tok_start.to(tok_end),
-                    )
+                    return SourceStr::new(&self.source[tok_start..tok_end], tok_start.to(tok_end))
                 }
             }
         }
-    }
-
-    fn consume_until(
-        &mut self,
-        start: &SourceChar,
-        end_cond: impl Fn(char) -> bool,
-    ) -> SourceStr<'a> {
-        let tok_start = start.end();
-        let mut tok_end = start.end();
-        while let Some(chr) = self.peek() {
-            tok_end = chr.end();
-            self.advance();
-            if chr.value == '\\' {
-                if let Some(next_chr) = self.peek() {
-                    tok_end = next_chr.end();
-                    self.advance();
-                }
-            }
-            if end_cond(chr.value) {
-                break;
-            }
-        }
-        SourceStr::new(
-            &self.source[tok_start.into()..tok_end.into()],
-            tok_start.to(tok_end),
-        )
     }
 
     /// Tokenizes the source, consuming the Tokenizer.
     /// Returns the tokenized source.
     pub fn tokenize(mut self) -> Vec<Token<'a>> {
         use TokenKind::*;
-        while let Some(chr) = self.next_char() {
+        while let Some(chr) = self.next() {
             // TODO: Consider preserving comments instead of just throwing them out
-            match chr.value {
-                '&' => self.push_tok_with(Ampersand, chr.span()),
-                '*' => self.push_tok_with(Asterisk, chr.span()),
-                ':' => self.push_tok_with(Colon, chr.span()),
-                ',' => self.push_tok_with(Comma, chr.span()),
-                '-' => self.push_tok_with(Dash, chr.span()),
-                '.' => self.push_tok_with(Dot, chr.span()),
-                '\"' => self.push_tok_with(DoubleQuote, chr.span()),
-                '>' => self.push_tok_with(Fold, chr.span()),
-                '\n' | '\r' => self.push_tok_with(Newline, chr.span()),
-                '{' => self.push_tok_with(LeftBrace, chr.span()),
-                '[' => self.push_tok_with(LeftBracket, chr.span()),
-                '|' => self.push_tok_with(Pipe, chr.span()),
-                '+' => self.push_tok_with(Plus, chr.span()),
-                '}' => self.push_tok_with(RightBrace, chr.span()),
-                ']' => self.push_tok_with(RightBracket, chr.span()),
-                '\'' => self.push_tok_with(SingleQuote, chr.span()),
-                '\t' | ' ' => {
-                    let tok = self.consume_whitespace(&chr);
+            match chr {
+                b'&' => self.push_tok_with(Ampersand, chr.span(self.idx)),
+                b'*' => self.push_tok_with(Asterisk, chr.span(self.idx)),
+                b':' => self.push_tok_with(Colon, chr.span(self.idx)),
+                b',' => self.push_tok_with(Comma, chr.span(self.idx)),
+                b'-' => self.push_tok_with(Dash, chr.span(self.idx)),
+                b'.' => self.push_tok_with(Dot, chr.span(self.idx)),
+                b'\"' => self.push_tok_with(DoubleQuote, chr.span(self.idx)),
+                b'>' => self.push_tok_with(Fold, chr.span(self.idx)),
+                b'\n' | b'\r' => self.push_tok_with(Newline, chr.span(self.idx)),
+                b'{' => self.push_tok_with(LeftBrace, chr.span(self.idx)),
+                b'[' => self.push_tok_with(LeftBracket, chr.span(self.idx)),
+                b'|' => self.push_tok_with(Pipe, chr.span(self.idx)),
+                b'+' => self.push_tok_with(Plus, chr.span(self.idx)),
+                b'}' => self.push_tok_with(RightBrace, chr.span(self.idx)),
+                b']' => self.push_tok_with(RightBracket, chr.span(self.idx)),
+                b'\'' => self.push_tok_with(SingleQuote, chr.span(self.idx)),
+                b'\t' | b' ' => {
+                    let tok = self.consume_whitespace();
                     self.push_tok(tok);
-                    if let Some(next_chr @ SourceChar { value: '#', .. }) = self.peek() {
-                        self.consume_until(&next_chr, |c| c == '\n');
+                    if let Some(b'#') = self.current {
+                        self.consume_matches(|c| !c.is_linebreak());
                     }
                 }
                 _ => {
                     if let Token {
                         kind: Literal(slice),
                         span,
-                    } = self.consume_literal(&chr)
+                    } = self.consume_literal()
                     {
                         self.push_tok_with(Literal(slice), span);
                     }
