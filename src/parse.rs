@@ -167,8 +167,8 @@ impl<'a, 'b> Parser<'a, 'b> {
                 self.parse()?
             }
             Newline => {
+                self.chomp_newlines()?;
                 self.indent = 0;
-                self.advance()?;
                 self.parse()?
             }
             // TODO: Provide error message
@@ -428,6 +428,13 @@ impl<'a, 'b> Parser<'a, 'b> {
                 break;
             }
         }
+    }
+
+    fn chomp_newlines(&mut self) -> Result<()> {
+        while let TokenKind::Newline = self.token.kind {
+            self.advance()?;
+        }
+        Ok(())
     }
 
     pub(crate) fn parse_sequence_flow(&mut self) -> Result<Yaml<'a>> {
