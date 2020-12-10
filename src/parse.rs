@@ -535,7 +535,8 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 seq.push(node);
                             }
                         }
-                        _ => return self.parse_error(),
+                        _ if self.indent == indent => break,
+                        _ => return self.parse_error_with_msg("expected sequence item"),
                     }
                 }
                 self.end_context(ParseContext::Sequence)?;

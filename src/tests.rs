@@ -398,10 +398,6 @@ r#"
 "# => err msg r#"error occurred parsing the input at line 2, column 25 : unexpected symbol '}'"#
 );
 
-mk_test!(
-infinite loop;
-std::str::from_utf8(&[45, 49, 58, 91, 32]).unwrap() => err YamlParseError{ line: 1, col: 5, msg: Some(String::from(r#"unexpectedly found "[" while parsing"#)), source: None }
-);
 
 mk_test!(
 input with doc start;
@@ -474,6 +470,22 @@ stuff:
     - this::thing::with::colons::and::all-these-other-indicator-characters-:used:-in--an:unquoted:::::::string
 
 " => map! { "stuff" => seq!("this::thing::with::colons::and::all-these-other-indicator-characters-:used:-in--an:unquoted:::::::string")}
+);
+
+// Regression tests
+
+mk_test!(issue_13a;
+r"
+foo:
+- baz
+bar: bax
+" => map! { "foo" => seq!("baz"); "bar" => "bax"}
+);
+
+mk_test!(issue_13b;
+r"
+value: {x: -0}
+" => map! { "value" => map! { "x" => seq!("0")}}
 );
 
 // Round trip
