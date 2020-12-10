@@ -398,7 +398,6 @@ r#"
 "# => err msg r#"error occurred parsing the input at line 2, column 25 : unexpected symbol '}'"#
 );
 
-
 mk_test!(
 input with doc start;
 r"
