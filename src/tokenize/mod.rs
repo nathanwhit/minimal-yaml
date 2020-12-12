@@ -107,7 +107,7 @@ impl ByteExt for u8 {
     fn is_indicator(self) -> bool {
         match self {
             b'-' | b'?' | b':' | b',' | b'[' | b']' | b'{' | b'}' | b'&' | b'*' | b'!' | b'|'
-            | b'>' | b'\"' | b'\'' | b'%' | b'@' | b'`' => true,
+            | b'#' | b'>' | b'\"' | b'\'' | b'%' | b'@' | b'`' => true,
             _ => false,
         }
     }

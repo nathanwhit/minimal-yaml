@@ -2,6 +2,7 @@ use crate::tokenize::{CharacterGroup, Token, TokenKind};
 use crate::{Entry, Yaml, YamlParseError};
 use core::iter::{Enumerate, Iterator, Peekable};
 use core::slice::Iter;
+use std::todo;
 
 use crate::Result;
 
@@ -176,7 +177,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub(crate) fn parse(&mut self) -> Result<Yaml<'a>> {
         use TokenKind::*;
-        dbg!(&self.contexts);
+        let context = self.context();
         let res = match self.token.kind {
             DoubleQuote | SingleQuote | Literal(..) => match self.context() {
                 None => {
@@ -209,19 +210,26 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let node = self.parse_sequence_flow()?;
                 self.parse_mapping_maybe(node)?
             }
-            Dash => match self.peek() {
-                Some(Token { kind: Dash, .. }) => {
-                    if self.check_ahead_n(2, |tk| matches!(tk, Dash)) {
-                        self.bump();
-                        self.bump();
-                        self.bump();
-                        self.parse()?
-                    } else {
-                        // TODO: Provide error message
-                        return self.parse_error_with_msg("failed to parse nested seqeuence");
+            Dash => match context {
+                _ => match self.peek() {
+                    Some(Token { kind: Dash, .. }) => {
+                        if self.check_ahead_n(2, |tk| matches!(tk, Dash)) {
+                            self.bump();
+                            self.bump();
+                            self.bump();
+                            self.parse()?
+                        } else {
+                            // TODO: Provide error message
+                            return self.parse_error_with_msg("failed to parse nested seqeuence");
+                        }
                     }
-                }
-                _ => self.parse_sequence_block()?,
+                    Some(Token {
+                        kind: Whitespace(_),
+                        ..
+                    })
+                    | Some(Token { kind: Newline, .. }) => self.parse_sequence_block()?,
+                    _ => self.parse_scalar()?,
+                },
             },
             RightBrace | RightBracket => {
                 return self
@@ -275,19 +283,17 @@ impl<'a, 'b> Parser<'a, 'b> {
                 let entire_literal = self.slice_tok_range((scal_start, scal_end));
                 Ok(Yaml::Scalar(entire_literal))
             }
-            Literal(..) => {
+            _ => {
                 let accept: Box<dyn Fn(&TokenKind<'_>, &TokenKind<'_>) -> bool> = match context {
-                    Some(ctx) => match dbg!(ctx) {
+                    Some(ctx) => match ctx {
                         ParseContext::FlowOut | ParseContext::BlockKey => {
                             Box::new(|tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
                                 use TokenKind::*;
-                                dbg!((tok, nxt));
                                 let safe =
                                     |t: &TokenKind<'_>| t.is_safe(CharacterGroup::NSPlainOut);
                                 let prod1 = safe(tok) && tok != &Colon;
                                 let prod3 = tok == &Colon && safe(nxt);
-                                dbg!((prod1, prod3, tok != &Newline));
-                                (prod1 || prod3) && tok != &Newline
+                                prod1 || prod3
                             })
                         }
                         ParseContext::FlowIn | ParseContext::FlowKey => {
@@ -296,7 +302,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                                 let safe = |t: &TokenKind<'_>| t.is_safe(CharacterGroup::NSPlainIn);
                                 let prod1 = safe(tok) && tok != &Colon;
                                 let prod3 = tok == &Colon && safe(nxt);
-                                (prod1 || prod3) && tok != &Newline
+                                prod1 || prod3
                             })
                         }
                         ParseContext::BlockIn | ParseContext::BlockOut => todo!(),
@@ -306,7 +312,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                         let safe = |t: &TokenKind<'_>| t.is_safe(CharacterGroup::NSPlainOut);
                         let prod1 = safe(tok) && tok != &Colon;
                         let prod3 = tok == &Colon && safe(nxt);
-                        (prod1 || prod3) && tok != &Newline
+                        prod1 || prod3
                     }),
                 };
                 let (start, mut end) = self.take_while(&accept)?;
@@ -323,14 +329,8 @@ impl<'a, 'b> Parser<'a, 'b> {
                     }
                 }
                 let entire_literal = self.slice_tok_range((start, end));
-                dbg!(entire_literal);
                 Ok(Yaml::Scalar(entire_literal))
             }
-            // TODO: Provide error message
-            _ => self.parse_error_with_msg(format!(
-                r#"unexpectedly found "{}" when parsing scalar"#,
-                self.token.kind
-            )),
         }
     }
 
@@ -372,6 +372,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         (0, 0)
     }
 
+    #[allow(unused)]
     fn parse_error<T>(&self) -> Result<T> {
         let (line, col) = self.lookup_line_col();
         Err(YamlParseError {
@@ -438,6 +439,15 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     pub(crate) fn parse_mapping_block(&mut self, start_key: Yaml<'a>) -> Result<Yaml<'a>> {
+        match self.context() {
+            Some(ParseContext::FlowIn)
+            | Some(ParseContext::FlowKey)
+            | Some(ParseContext::FlowOut) => {
+                return self
+                    .parse_error_with_msg("block mappings may not appear in flow collections")
+            }
+            _ => {}
+        }
         use TokenKind::*;
         let indent = self.indent;
         match self.token.kind {
@@ -568,6 +578,15 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     pub(crate) fn parse_sequence_block(&mut self) -> Result<Yaml<'a>> {
+        match self.context() {
+            Some(ParseContext::FlowIn)
+            | Some(ParseContext::FlowKey)
+            | Some(ParseContext::FlowOut) => {
+                return self
+                    .parse_error_with_msg("block sequences may not appear in flow collections")
+            }
+            _ => {}
+        }
         use TokenKind::*;
         self.start_context(ParseContextKind::Block)?;
         let indent = self.indent;
@@ -609,10 +628,12 @@ impl<'a, 'b> Parser<'a, 'b> {
                                     let node = self.parse()?;
                                     seq.push(node);
                                 }
-                            } else {
+                            } else if self.check_ahead_1(|t| matches!(t, Whitespace(_))) {
                                 self.advance()?;
                                 let node = self.parse()?;
                                 seq.push(node);
+                            } else {
+                                return self.parse_error_with_msg("unexpected '-'");
                             }
                         }
                         _ if self.indent == indent => break,
@@ -704,6 +725,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 }
 #[derive(Clone, Copy)]
 enum TakeUntilCond {
+    #[allow(unused)]
     MatchOrEnd,
     MatchOrErr,
 }

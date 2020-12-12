@@ -14,6 +14,15 @@ impl<'a> From<&'a str> for Yaml<'a> {
 }
 
 macro_rules! mk_test {
+    ($($name: ident) +; $inp: expr => fail) => {
+        paste::item! {
+            #[test]
+            fn [<test_parse_$($name _)+>] () {
+                let input: &str = $inp;
+                parse(input).unwrap_err();
+            }
+        }
+    };
     ($($name: ident) +; $inp: expr => $exp: expr) => {
         paste::item! {
             #[test]
@@ -46,7 +55,7 @@ macro_rules! mk_test {
             }
         }
     };
-    ($($name: ident) +; $inp: expr => matches $exp: expr) => {
+    ($($name: ident) +; $inp: stmt => matches $exp: expr) => {
         paste::item! {
             #[test]
             fn [<test_parse_$($name _)+>] () {
@@ -154,7 +163,7 @@ mk_test!(
 
 macro_rules! map {
     { $($key : tt : $val : tt),* } => {
-        Mapping(vec![$(Entry { key: Scalar($key) , value: Scalar($val) }),*])
+        Mapping(vec![$(Entry { key: $key.into() , value: $val.into() }),*])
     };
     { $($key : expr => $val : expr);* } => {
         Mapping(vec![$(Entry { key: $key.into() , value: $val.into() }),*])
@@ -216,7 +225,7 @@ r#"
 - a
 - sequence
 - of
--yaml
+- yaml
 -   nodes
 - "in"
 - 'block'
@@ -445,7 +454,7 @@ readme example;
 r"
 [this, is] :
  -
-  -totally
+  - totally
   - valid
  - input
  - {to : the parser}
@@ -484,7 +493,26 @@ bar: bax
 mk_test!(issue_13b;
 r"
 value: {x: -0}
-" => map! { "value" => map! { "x" => seq!("0")}}
+" => map! { "value" => map! { "x": "-0" }}
+);
+
+mk_test!(malformed seq;
+r"
+- a
+-b
+" => fail
+);
+
+mk_test!(issue_14;
+r"a: -1" => map! { "a": "-1" }
+);
+
+mk_test!(issue_15a;
+r"a: foo[0]" => map! { "a": "foo[0]" }
+);
+
+mk_test!(issue_15b;
+r"a: a - a" => map! { "a": "a - a"}
 );
 
 // Round trip
