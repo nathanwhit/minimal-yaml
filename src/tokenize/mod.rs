@@ -157,7 +157,7 @@ pub(crate) enum TokenKind<'a> {
 }
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
-pub(crate) enum CharacterGroup {
+pub(crate) enum TokenGroup {
     NSPlainOut,
     NSPlainIn,
 }
@@ -182,12 +182,12 @@ impl<'a> TokenKind<'a> {
         )
     }
 
-    pub fn is_safe(&self, group: CharacterGroup) -> bool {
+    pub fn is_safe(&self, group: TokenGroup) -> bool {
         match group {
-            CharacterGroup::NSPlainIn => {
+            TokenGroup::NSPlainIn => {
                 self.is_non_ws() && !self.is_flow_indicator() && !matches!(self, TokenKind::Newline)
             }
-            CharacterGroup::NSPlainOut => self.is_non_ws() && !matches!(self, TokenKind::Newline),
+            TokenGroup::NSPlainOut => self.is_non_ws() && !matches!(self, TokenKind::Newline),
         }
     }
 

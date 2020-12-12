@@ -1,4 +1,4 @@
-use crate::tokenize::{CharacterGroup, Token, TokenKind};
+use crate::tokenize::{Token, TokenGroup, TokenKind};
 use crate::{Entry, Yaml, YamlParseError};
 use core::iter::{Enumerate, Iterator, Peekable};
 use core::slice::Iter;
@@ -289,8 +289,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                         ParseContext::FlowOut | ParseContext::BlockKey => {
                             Box::new(|tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
                                 use TokenKind::*;
-                                let safe =
-                                    |t: &TokenKind<'_>| t.is_safe(CharacterGroup::NSPlainOut);
+                                let safe = |t: &TokenKind<'_>| t.is_safe(TokenGroup::NSPlainOut);
                                 let prod1 = safe(tok) && tok != &Colon;
                                 let prod3 = tok == &Colon && safe(nxt);
                                 prod1 || prod3
@@ -299,7 +298,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                         ParseContext::FlowIn | ParseContext::FlowKey => {
                             Box::new(|tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
                                 use TokenKind::*;
-                                let safe = |t: &TokenKind<'_>| t.is_safe(CharacterGroup::NSPlainIn);
+                                let safe = |t: &TokenKind<'_>| t.is_safe(TokenGroup::NSPlainIn);
                                 let prod1 = safe(tok) && tok != &Colon;
                                 let prod3 = tok == &Colon && safe(nxt);
                                 prod1 || prod3
@@ -309,7 +308,7 @@ impl<'a, 'b> Parser<'a, 'b> {
                     },
                     None => Box::new(|tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
                         use TokenKind::*;
-                        let safe = |t: &TokenKind<'_>| t.is_safe(CharacterGroup::NSPlainOut);
+                        let safe = |t: &TokenKind<'_>| t.is_safe(TokenGroup::NSPlainOut);
                         let prod1 = safe(tok) && tok != &Colon;
                         let prod3 = tok == &Colon && safe(nxt);
                         prod1 || prod3
