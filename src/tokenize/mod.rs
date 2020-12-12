@@ -106,8 +106,8 @@ trait ByteExt {
 impl ByteExt for u8 {
     fn is_indicator(self) -> bool {
         match self {
-            b'-' | b'?' | b':' | b',' | b'[' | b']' | b'{' | b'}' | b'#' | b'&' | b'*' | b'!'
-            | b'|' | b'>' | b'\"' | b'\'' | b'%' | b'@' | b'`' => true,
+            b'-' | b'?' | b':' | b',' | b'[' | b']' | b'{' | b'}' | b'&' | b'*' | b'!' | b'|'
+            | b'#' | b'>' | b'\"' | b'\'' | b'%' | b'@' | b'`' => true,
             _ => false,
         }
     }
@@ -156,6 +156,12 @@ pub(crate) enum TokenKind<'a> {
     Dummy,
 }
 
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
+pub(crate) enum TokenGroup {
+    NSPlainOut,
+    NSPlainIn,
+}
+
 impl<'a> TokenKind<'a> {
     #[allow(unused)]
     pub fn is_indicator(&self) -> bool {
@@ -174,6 +180,19 @@ impl<'a> TokenKind<'a> {
                 | DoubleQuote
                 | QuestionMark
         )
+    }
+
+    pub fn is_safe(&self, group: TokenGroup) -> bool {
+        match group {
+            TokenGroup::NSPlainIn => {
+                self.is_non_ws() && !self.is_flow_indicator() && !matches!(self, TokenKind::Newline)
+            }
+            TokenGroup::NSPlainOut => self.is_non_ws() && !matches!(self, TokenKind::Newline),
+        }
+    }
+
+    pub fn is_non_ws(&self) -> bool {
+        !matches!(self, TokenKind::Whitespace(_))
     }
 
     #[allow(unused)]
