@@ -323,6 +323,19 @@ key: #comment 1
 );
 
 mk_test!(
+scalar with pound in middle;
+r#"
+- foo#bar
+- "baz#bax"
+- 'quux#xyzzy'
+"# => seq!(
+        "foo",
+        r##""baz#bax""##,
+        r"'quux#xyzzy'"
+    )
+);
+
+mk_test!(
 input with error;
 r#"
 {key: value, missing : }

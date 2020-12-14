@@ -510,7 +510,6 @@ impl<'a, 'b> Parser<'a> {
                     break;
                 }
             }
-            self.bump_newline();
         }
     }
 
