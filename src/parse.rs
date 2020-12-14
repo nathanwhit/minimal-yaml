@@ -1,7 +1,7 @@
-use crate::tokenize::{Token, TokenGroup, TokenKind};
+use crate::tokenize::{ByteExt, CharGroup};
 use crate::{Entry, Yaml, YamlParseError};
-use core::iter::{Enumerate, Iterator, Peekable};
-use core::slice::Iter;
+use core::iter::{Iterator, Peekable};
+use std::str::Bytes;
 use std::todo;
 
 use crate::Result;
@@ -16,7 +16,7 @@ macro_rules! matches {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ParseContext {
+pub(crate) enum ParseContext {
     FlowIn,
     FlowOut,
     FlowKey,
@@ -33,20 +33,20 @@ enum ParseContextKind {
     Block,
 }
 
-pub(crate) struct Parser<'a, 'b> {
-    token: &'b Token<'a>,
-    stream: Peekable<Enumerate<Iter<'b, Token<'a>>>>,
-    tok_stream: &'b [Token<'a>],
+pub(crate) struct Parser<'a> {
+    current: u8,
+    stream: Peekable<Bytes<'a>>,
+    bytes: &'a [u8],
     source: &'a str,
-    tok_idx: usize,
+    idx: usize,
     indent: usize,
-    expected: Vec<TokenKind<'a>>,
+    expected: Vec<u8>,
     contexts: Vec<ParseContext>,
 }
 
-impl<'a, 'b> Parser<'a, 'b> {
-    pub(crate) fn new(source: &'a str, tok_stream: &'b [Token<'a>]) -> Result<Self> {
-        let mut stream = tok_stream.iter().enumerate().peekable();
+impl<'a, 'b> Parser<'a> {
+    pub(crate) fn new(source: &'a str) -> Result<Self> {
+        let mut stream = source.bytes().peekable();
         let first = stream.next().ok_or_else(|| YamlParseError {
             line: 0,
             col: 0,
@@ -54,11 +54,11 @@ impl<'a, 'b> Parser<'a, 'b> {
             source: None,
         })?;
         Ok(Self {
-            token: &first.1,
+            current: first,
+            bytes: source.as_bytes(),
             stream,
-            tok_stream,
             source,
-            tok_idx: first.0,
+            idx: 0,
             indent: 0,
             expected: Vec::new(),
             contexts: Vec::new(),
@@ -134,9 +134,21 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     fn bump(&mut self) -> bool {
         match self.stream.next() {
-            Some(tok) => {
-                self.tok_idx = tok.0;
-                self.token = tok.1;
+            Some(byte) => {
+                self.idx += 1;
+                self.current = byte;
+                true
+            }
+            None => false,
+        }
+    }
+
+    fn bump_newline(&mut self) -> bool {
+        match self.stream.next() {
+            Some(b'\n') | Some(b'\r') => self.bump(),
+            Some(byte) => {
+                self.idx += 1;
+                self.current = byte;
                 true
             }
             None => false,
@@ -151,23 +163,21 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    fn peek(&mut self) -> Option<&Token<'a>> {
-        self.stream.peek().map(|t| t.1)
+    fn peek(&mut self) -> Option<u8> {
+        self.stream.peek().copied()
     }
 
     fn at_end(&self) -> bool {
-        self.tok_idx == self.tok_stream.len() - 1
+        self.idx == self.bytes.len() - 1
     }
 
     fn parse_mapping_maybe(&mut self, node: Yaml<'a>) -> Result<Yaml<'a>> {
-        use TokenKind::*;
         self.chomp_whitespace();
-        match self.token.kind {
-            Colon
-                if match self.expected.last() {
-                    Some(RightBrace) | Some(Colon) => false,
-                    _ => true,
-                } =>
+        match self.current {
+            b':' if match self.expected.last() {
+                Some(b'}') | Some(b':') => false,
+                _ => true,
+            } =>
             {
                 self.parse_mapping_block(node)
             }
@@ -176,73 +186,54 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     pub(crate) fn parse(&mut self) -> Result<Yaml<'a>> {
-        use TokenKind::*;
         let context = self.context();
-        let res = match self.token.kind {
-            DoubleQuote | SingleQuote | Literal(..) => match self.context() {
-                None => {
-                    self.start_context(ParseContextKind::BlockMapping)?;
-                    let node = self.parse_scalar()?;
-                    self.end_context(ParseContextKind::BlockMapping)?;
-                    self.parse_mapping_maybe(node)?
-                }
-                Some(ctx) => match ctx {
-                    ParseContext::FlowIn | ParseContext::FlowOut | ParseContext::FlowKey => {
-                        self.parse_scalar()?
-                    }
-                    _ => {
-                        self.start_context(ParseContextKind::BlockMapping)?;
-                        let node = self.parse_scalar()?;
-                        self.end_context(ParseContextKind::BlockMapping)?;
-                        self.parse_mapping_maybe(node)?
-                    }
-                },
-            },
-            LeftBrace => {
-                self.expected.push(RightBrace);
+        let peeked = self.peek();
+        let res = match self.current {
+            b'-' if self.check_ahead_1(|val| val == b'-')
+                && self.check_ahead_n(2, |val| val == b'-') =>
+            {
+                self.bump();
+                self.bump();
+                self.bump();
+                self.parse()?
+            }
+            b'\n' | b'\r' => {
+                self.chomp_newlines()?;
+                self.indent = 0;
+                self.parse()?
+            }
+            byt if byt.is_scalar_start(peeked, context) => self.parse_maybe_scalar()?,
+            b'{' => {
+                self.expected.push(b'}');
                 let res = self.parse_mapping_flow()?;
-                if let Some(RightBrace) = self.expected.last() {
-                    self.pop_if_match(&RightBrace)?;
+                if let Some(b'}') = self.expected.last() {
+                    self.pop_if_match(b'}')?;
                 }
                 self.parse_mapping_maybe(res)?
             }
-            LeftBracket => {
+            b'[' => {
                 let node = self.parse_sequence_flow()?;
                 self.parse_mapping_maybe(node)?
             }
-            Dash => match context {
+            b'-' => match context {
                 _ => match self.peek() {
-                    Some(Token { kind: Dash, .. }) => {
-                        if self.check_ahead_n(2, |tk| matches!(tk, Dash)) {
-                            self.bump();
-                            self.bump();
-                            self.bump();
-                            self.parse()?
-                        } else {
-                            // TODO: Provide error message
-                            return self.parse_error_with_msg("failed to parse nested seqeuence");
-                        }
+                    Some(byt) if byt.is_linebreak() || byt.is_ws() => {
+                        self.parse_sequence_block()?
                     }
-                    Some(Token {
-                        kind: Whitespace(_),
-                        ..
-                    })
-                    | Some(Token { kind: Newline, .. }) => self.parse_sequence_block()?,
-                    _ => self.parse_scalar()?,
+                    byt => unreachable!(format!("unexpected {:?}", byt.map(char::from))),
                 },
             },
-            RightBrace | RightBracket => {
-                return self
-                    .parse_error_with_msg(format!(r#"unexpected symbol '{}'"#, self.token.kind))
+            b'}' | b']' => {
+                return self.parse_error_with_msg(format!(
+                    r#"unexpected symbol '{}'"#,
+                    char::from(self.current)
+                ))
             }
-            Whitespace(amt) => {
-                self.indent = amt;
-                self.advance()?;
-                self.parse()?
-            }
-            Newline => {
-                self.chomp_newlines()?;
-                self.indent = 0;
+            b if b.is_ws() => {
+                self.chomp_indent();
+                if self.at_end() {
+                    return self.parse_error_with_msg("unexpected end of file");
+                }
                 self.parse()?
             }
             // TODO: Provide error message
@@ -250,67 +241,84 @@ impl<'a, 'b> Parser<'a, 'b> {
         };
         Ok(res)
     }
+    pub(crate) fn parse_maybe_scalar(&mut self) -> Result<Yaml<'a>> {
+        match self.context() {
+            None => {
+                self.start_context(ParseContextKind::BlockMapping)?;
+                let node = self.parse_scalar()?;
+                self.end_context(ParseContextKind::BlockMapping)?;
+                self.parse_mapping_maybe(node)
+            }
+            Some(ctx) => match ctx {
+                ParseContext::FlowIn | ParseContext::FlowOut | ParseContext::FlowKey => {
+                    self.parse_scalar()
+                }
+                _ => {
+                    self.start_context(ParseContextKind::BlockMapping)?;
+                    let node = self.parse_scalar()?;
+                    self.end_context(ParseContextKind::BlockMapping)?;
+                    self.parse_mapping_maybe(node)
+                }
+            },
+        }
+    }
 
     pub(crate) fn parse_scalar(&mut self) -> Result<Yaml<'a>> {
-        use TakeUntilCond::*;
-        use TokenKind::*;
+        use TakeUntilCond::MatchOrErr;
         let context = self.context();
-        match self.token.kind {
+        match self.current {
             // TODO: currently qouble quote/single quote scalars are handled identically. maybe handle as defined
             // by the YAML spec?
-            DoubleQuote => {
-                let scal_start = self.tok_idx;
+            b'\"' => {
+                let scal_start = self.idx;
                 self.advance()?;
-                self.take_until(MatchOrErr, |tok, _| matches!(tok, DoubleQuote))?;
+                self.take_until(MatchOrErr, |tok, _| matches!(tok, b'\"'))?;
                 let scal_end = if self.bump() {
-                    self.tok_idx
+                    self.idx
                 } else {
-                    self.tok_stream.len()
+                    self.bytes.len()
                 };
-                let entire_literal = self.slice_tok_range((scal_start, scal_end));
+                let entire_literal = self.slice_range((scal_start, scal_end));
 
                 Ok(Yaml::Scalar(entire_literal))
             }
-            SingleQuote => {
-                let scal_start = self.tok_idx;
+            b'\'' => {
+                let scal_start = self.idx;
                 self.advance()?;
-                self.take_until(MatchOrErr, |tok, _| matches!(tok, SingleQuote))?;
+                self.take_until(MatchOrErr, |tok, _| matches!(tok, b'\''))?;
                 let scal_end = if self.bump() {
-                    self.tok_idx
+                    self.idx
                 } else {
-                    self.tok_stream.len()
+                    self.bytes.len()
                 };
-                let entire_literal = self.slice_tok_range((scal_start, scal_end));
+                let entire_literal = self.slice_range((scal_start, scal_end));
                 Ok(Yaml::Scalar(entire_literal))
             }
             _ => {
-                let accept: Box<dyn Fn(&TokenKind<'_>, &TokenKind<'_>) -> bool> = match context {
+                let accept: Box<dyn Fn(u8, u8) -> bool> = match context {
                     Some(ctx) => match ctx {
                         ParseContext::FlowOut | ParseContext::BlockKey => {
-                            Box::new(|tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
-                                use TokenKind::*;
-                                let safe = |t: &TokenKind<'_>| t.is_safe(TokenGroup::NSPlainOut);
-                                let prod1 = safe(tok) && tok != &Colon;
-                                let prod3 = tok == &Colon && safe(nxt);
+                            Box::new(|tok: u8, nxt: u8| {
+                                let safe = |t: u8| t.is_safe(CharGroup::NSPlainOut);
+                                let prod1 = safe(tok) && tok != b':';
+                                let prod3 = tok == b':' && safe(nxt);
                                 prod1 || prod3
                             })
                         }
                         ParseContext::FlowIn | ParseContext::FlowKey => {
-                            Box::new(|tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
-                                use TokenKind::*;
-                                let safe = |t: &TokenKind<'_>| t.is_safe(TokenGroup::NSPlainIn);
-                                let prod1 = safe(tok) && tok != &Colon;
-                                let prod3 = tok == &Colon && safe(nxt);
+                            Box::new(|tok: u8, nxt: u8| {
+                                let safe = |t: u8| t.is_safe(CharGroup::NSPlainIn);
+                                let prod1 = safe(tok) && tok != b':';
+                                let prod3 = tok == b':' && safe(nxt);
                                 prod1 || prod3
                             })
                         }
                         ParseContext::BlockIn | ParseContext::BlockOut => todo!(),
                     },
-                    None => Box::new(|tok: &TokenKind<'_>, nxt: &TokenKind<'_>| {
-                        use TokenKind::*;
-                        let safe = |t: &TokenKind<'_>| t.is_safe(TokenGroup::NSPlainOut);
-                        let prod1 = safe(tok) && tok != &Colon;
-                        let prod3 = tok == &Colon && safe(nxt);
+                    None => Box::new(|tok: u8, nxt: u8| {
+                        let safe = |t: u8| t.is_safe(CharGroup::NSPlainOut);
+                        let prod1 = safe(tok) && tok != b':';
+                        let prod3 = tok == b':' && safe(nxt);
                         prod1 || prod3
                     }),
                 };
@@ -327,14 +335,14 @@ impl<'a, 'b> Parser<'a, 'b> {
                         break;
                     }
                 }
-                let entire_literal = self.slice_tok_range((start, end));
+                let entire_literal = self.slice_range((start, end));
                 Ok(Yaml::Scalar(entire_literal))
             }
         }
     }
 
     fn lookup_line_col(&self) -> (usize, usize) {
-        let err_off: usize = usize::from(self.token.start()) + 1;
+        let err_off: usize = usize::from(self.idx) + 1;
         let mut off = 0;
         let mut line_len = 0;
         let mut chars = self.source.chars().map(|c| (c, c.len_utf8()));
@@ -379,7 +387,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             col,
             msg: Some(format!(
                 r#"unexpectedly found "{}" while parsing"#,
-                self.token.kind
+                self.current
             )),
             source: None,
         })
@@ -396,31 +404,30 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     pub(crate) fn parse_mapping_flow(&mut self) -> Result<Yaml<'a>> {
-        use TokenKind::*;
-        match self.token.kind {
-            LeftBrace => (),
+        match self.current {
+            b'{' => (),
             _ => return self.parse_error_with_msg("expected left brace"),
         }
         self.advance()?;
         let mut entries: Vec<Entry<'a>> = Vec::new();
         loop {
-            match &self.token.kind {
-                RightBrace => {
+            match &self.current {
+                b'}' => {
                     self.bump();
                     return Ok(Yaml::Mapping(entries));
                 }
-                Comma => {
+                b',' => {
                     self.advance()?;
                 }
                 _ => {
-                    self.expected.push(Colon);
+                    self.expected.push(b':');
                     self.start_context(ParseContextKind::FlowMapping)?;
                     let key = self.parse()?;
                     self.end_context(ParseContextKind::FlowMapping)?;
                     self.chomp_whitespace();
-                    match self.token.kind {
-                        Colon => {
-                            self.pop_if_match(&Colon)?;
+                    match self.current {
+                        b':' => {
+                            self.pop_if_match(b':')?;
                             self.advance()?;
                             self.chomp_whitespace();
                             self.start_context(ParseContextKind::Flow)?;
@@ -447,40 +454,35 @@ impl<'a, 'b> Parser<'a, 'b> {
             }
             _ => {}
         }
-        use TokenKind::*;
         let indent = self.indent;
-        match self.token.kind {
-            Colon => {
+        match self.current {
+            b':' => {
                 self.advance()?;
                 let mut entries = Vec::new();
                 self.chomp_whitespace();
                 let value = self.parse()?;
                 entries.push(Entry::new(start_key, value));
                 loop {
-                    match self.token.kind {
-                        Newline => {
+                    match self.current {
+                        _ if self.at_end() => break,
+                        byt if byt.is_linebreak() => {
                             self.indent = 0;
-                            if self.bump() {
+                            if self.bump_newline() {
                                 continue;
                             } else {
                                 break;
                             }
                         }
-                        Whitespace(idt) => {
-                            self.indent = idt;
-                            if !self.bump() {
-                                break;
-                            }
+                        byt if byt.is_ws() => {
+                            self.chomp_indent();
                         }
-                        _ if self.indent < indent || self.at_end() => break,
+                        _ if self.indent < indent => break,
                         _ => {
-                            self.expected.push(Colon);
-                            self.start_context(ParseContextKind::BlockMapping)?;
+                            self.expected.push(b':');
                             let key = self.parse()?;
                             self.chomp_whitespace();
-                            self.end_context(ParseContextKind::BlockMapping)?;
-                            if let Colon = self.token.kind {
-                                self.pop_if_match(&Colon)?;
+                            if let b':' = self.current {
+                                self.pop_if_match(b':')?;
                                 self.advance()?;
                                 self.chomp_whitespace();
                                 let value = self.parse()?;
@@ -499,57 +501,63 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    fn slice_tok_range(&self, range: (usize, usize)) -> &'a str {
-        let start = self.tok_stream[range.0].start();
-        let end = match self.tok_stream.get(range.1) {
-            Some(tok) => tok.start(),
-            None => self.tok_stream.last().unwrap().end(),
-        };
+    fn slice_range(&self, (start, end): (usize, usize)) -> &'a str {
+        let end = usize::min(end, self.bytes.len());
         &self.source[start.into()..end.into()]
     }
 
     fn chomp_whitespace(&mut self) {
-        while let TokenKind::Whitespace(..) = self.token.kind {
+        while let b' ' | b'\t' = self.current {
             if !self.bump() {
                 break;
             }
         }
     }
 
+    fn chomp_indent(&mut self) {
+        let mut idt = 0;
+        while let b' ' | b'\t' = self.current {
+            if !self.bump() {
+                break;
+            }
+            idt += 1;
+        }
+        self.indent = idt;
+    }
+
     fn chomp_newlines(&mut self) -> Result<()> {
-        while let TokenKind::Newline = self.token.kind {
+        while let b'\r' | b'\n' = self.current {
             self.advance()?;
         }
         Ok(())
     }
 
     pub(crate) fn parse_sequence_flow(&mut self) -> Result<Yaml<'a>> {
-        use TokenKind::*;
         self.start_context(ParseContextKind::Flow)?;
-        match self.token.kind {
-            LeftBracket => {
+        match self.current {
+            b'[' => {
                 self.advance()?;
                 let mut elements = Vec::new();
                 loop {
-                    match self.token.kind {
-                        RightBracket => {
+                    match self.current {
+                        b']' => {
                             self.bump();
                             self.end_context(ParseContextKind::Flow)?;
                             return Ok(Yaml::Sequence(elements));
                         }
-                        Whitespace(..) => {
-                            self.advance()?;
+                        b' ' | b'\t' => {
+                            self.chomp_whitespace();
                         }
                         _ => {
                             let elem = self.parse()?;
                             elements.push(elem);
                             self.chomp_whitespace();
-                            match self.token.kind {
-                                Comma => {
+                            match self.current {
+                                b',' => {
                                     self.advance()?;
                                     continue;
                                 }
-                                RightBracket => {
+                                b']' => {
                                     self.bump();
                                     self.end_context(ParseContextKind::Flow)?;
                                     return Ok(Yaml::Sequence(elements));
@@ -569,9 +577,9 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    fn check_ahead_1(&mut self, stop: impl Fn(&TokenKind<'a>) -> bool) -> bool {
-        match self.peek() {
-            Some(tok) => stop(&tok.kind),
+    fn check_ahead_1(&self, stop: impl Fn(u8) -> bool) -> bool {
+        match self.bytes.get(self.idx + 1) {
+            Some(&b) => stop(b),
             None => false,
         }
     }
@@ -586,36 +594,34 @@ impl<'a, 'b> Parser<'a, 'b> {
             }
             _ => {}
         }
-        use TokenKind::*;
         self.start_context(ParseContextKind::Block)?;
         let indent = self.indent;
-        match self.token.kind {
-            Dash => {
+        match self.current {
+            b'-' => {
                 let mut seq = Vec::new();
                 loop {
-                    match self.token.kind {
-                        Newline => {
+                    match self.current {
+                        _ if self.at_end() => break,
+                        byt if byt.is_linebreak() => {
                             self.indent = 0;
-                            if self.bump() {
+                            if self.bump_newline() {
                                 continue;
                             } else {
                                 break;
                             }
                         }
-                        Whitespace(idt) => {
-                            self.indent = idt;
-                            if !self.bump() {
-                                break;
-                            }
+                        byt if byt.is_ws() => {
+                            self.chomp_indent();
                         }
-                        _ if self.indent < indent || self.at_end() => break,
-                        Dash => {
-                            if self.check_ahead_1(|t| matches!(t, Newline)) {
+                        _ if self.indent < indent => break,
+                        b'-' => {
+                            if self.check_ahead_1(|t| t.is_linebreak()) {
                                 self.advance()?;
                                 self.advance()?;
                                 self.indent = 0;
-                                if let Whitespace(idt) = self.token.kind {
-                                    if idt < indent {
+                                if self.current.is_ws() {
+                                    self.chomp_indent();
+                                    if self.indent < indent {
                                         break;
                                     } else {
                                         let node = self.parse()?;
@@ -627,7 +633,8 @@ impl<'a, 'b> Parser<'a, 'b> {
                                     let node = self.parse()?;
                                     seq.push(node);
                                 }
-                            } else if self.check_ahead_1(|t| matches!(t, Whitespace(_))) {
+                            } else if self.check_ahead_1(|t| t.is_ws()) {
+                                self.advance()?;
                                 self.advance()?;
                                 let node = self.parse()?;
                                 seq.push(node);
@@ -647,31 +654,21 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    fn check_ahead_n(&self, n: usize, stop: impl Fn(&TokenKind<'a>) -> bool) -> bool {
-        match self.tok_stream.get(self.tok_idx + n) {
-            Some(Token { kind: tok_kind, .. }) => stop(tok_kind),
+    fn check_ahead_n(&self, n: usize, stop: impl Fn(u8) -> bool) -> bool {
+        match self.bytes.get(self.idx + n) {
+            Some(&b) => stop(b),
             None => false,
         }
     }
 
-    fn peekahead_n(&self, n: usize) -> Option<&TokenKind<'a>> {
-        match self.tok_stream.get(self.tok_idx + n) {
-            Some(Token { kind: tok_kind, .. }) => Some(tok_kind),
-            None => None,
-        }
-    }
-
-    fn take_while(
-        &mut self,
-        accept: impl Fn(&TokenKind<'a>, &TokenKind<'a>) -> bool,
-    ) -> Result<(usize, usize)> {
-        let start = self.tok_idx;
+    fn take_while(&mut self, accept: impl Fn(u8, u8) -> bool) -> Result<(usize, usize)> {
+        let start = self.idx;
         let mut end = start;
         loop {
-            let peeked = self.peekahead_n(1);
+            let peeked = self.peek();
             if !match peeked {
-                Some(tok_kind) => accept(&self.token.kind, tok_kind),
-                None => accept(&self.token.kind, &TokenKind::default()),
+                Some(byte) => accept(self.current, byte),
+                None => accept(self.current, u8::default()),
             } {
                 break;
             } else if !self.bump() {
@@ -686,20 +683,20 @@ impl<'a, 'b> Parser<'a, 'b> {
     fn take_until(
         &mut self,
         cond: TakeUntilCond,
-        stop: impl Fn(&TokenKind<'a>, &TokenKind<'a>) -> bool,
+        stop: impl Fn(u8, u8) -> bool,
     ) -> Result<(usize, usize)> {
-        let start = self.tok_idx;
+        let start = self.idx;
         let mut end = start;
         loop {
-            let peeked = self.peekahead_n(1);
+            let peeked = self.peek();
             if match peeked {
-                Some(tok_kind) => stop(&self.token.kind, tok_kind),
-                None => stop(&self.token.kind, &TokenKind::default()),
+                Some(tok_kind) => stop(self.current, tok_kind),
+                None => stop(self.current, u8::default()),
             } {
                 break;
             } else if !self.bump() {
                 return match cond {
-                    TakeUntilCond::MatchOrEnd => Ok((start, self.tok_stream.len())),
+                    TakeUntilCond::MatchOrEnd => Ok((start, self.bytes.len())),
                     // TODO: Provide error message
                     TakeUntilCond::MatchOrErr => {
                         self.parse_error_with_msg("failed to find expected tokens")
@@ -711,9 +708,9 @@ impl<'a, 'b> Parser<'a, 'b> {
         Ok((start, end))
     }
 
-    fn pop_if_match(&mut self, expect: &TokenKind<'a>) -> Result<()> {
+    fn pop_if_match(&mut self, expect: u8) -> Result<()> {
         match self.expected.last() {
-            Some(tk) if tk == expect => {
+            Some(&val) if val == expect => {
                 self.expected.pop();
                 Ok(())
             }

@@ -9,7 +9,6 @@ pub use crate::errors::YamlParseError;
 pub(crate) type Result<T> = std::result::Result<T, YamlParseError>;
 
 use parse::Parser;
-use tokenize::Tokenizer;
 
 use std::{fmt, fmt::Display};
 #[cfg_attr(test, derive(serde::Deserialize, serde::Serialize))]
@@ -175,8 +174,6 @@ impl<'a> Display for Entry<'a> {
 /// Returns `Err` if the input is invalid Yaml, with a message indicating
 /// where the error occurred and possibly more information on the cause
 pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
-    let tokenizer = Tokenizer::from_str(input);
-    let tokens = tokenizer.tokenize();
-    let mut parser = Parser::new(input, &tokens)?;
+    let mut parser = Parser::new(input)?;
     parser.parse()
 }

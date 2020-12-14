@@ -13,6 +13,56 @@ impl<'a> From<&'a str> for Yaml<'a> {
     }
 }
 
+#[allow(unused)]
+macro_rules! custom_test {
+    (
+        #[test(timeout = $timeout:expr)]
+        $( #[$meta:meta] )*
+        fn $fname:ident $($rest:tt)*
+    ) => (
+        #[test]
+        $( #[$meta] )*
+        fn $fname ()
+        {
+            let (done_tx, done_rx) = ::std::sync::mpsc::channel();
+            let handle =
+                ::std::thread::Builder::new()
+                    .name(
+                        concat!(module_path!(), "::", stringify!($fname))
+                            .splitn(2, "::").nth(1).unwrap()
+                            .into()
+                    )
+                    .spawn(move || {
+                        {
+                            fn $fname $($rest)*
+                            $fname();
+                        }
+                        let _ = done_tx.send(());
+                    })
+                    .unwrap()
+            ;
+
+            match done_rx.recv_timeout({
+                use ::std::time::*;
+                $timeout
+            }) {
+                | Err(::std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    panic!("Test took too long");
+                },
+                | _ => if let Err(err) = handle.join() {
+                    ::std::panic::resume_unwind(err);
+                },
+            }
+        }
+    );
+
+    (
+        $($tt:tt)*
+    ) => (
+        $($tt)*
+    );
+}
+
 macro_rules! mk_test {
     ($($name: ident) +; $inp: expr => fail) => {
         paste::item! {
@@ -20,6 +70,17 @@ macro_rules! mk_test {
             fn [<test_parse_$($name _)+>] () {
                 let input: &str = $inp;
                 parse(input).unwrap_err();
+            }
+        }
+    };
+    (timeout = $e:expr; $($name: ident) +; $inp: expr => $exp: expr) => {
+        paste::item! {
+            custom_test! {
+                #[test(timeout = $e)]
+                fn [<test_parse_$($name _)+>] () {
+                    let input: &str = $inp;
+                    assert_eq!(parse(input).unwrap(), $exp);
+                }
             }
         }
     };
@@ -269,6 +330,15 @@ r#"
 );
 
 mk_test!(
+super simple block sequence nested;
+r#"
+-
+  - " a "
+  - ' nested'
+"# => seq!(seq!(r#"" a ""#, r"' nested'"))
+);
+
+mk_test!(
 block sequence multiple nested;
 r##"
 -
@@ -323,6 +393,14 @@ r##"
 );
 
 // Block mappings
+
+mk_test!(
+    super simple;
+r#"
+key : value
+key2 : value2
+"# => map! { "key" : "value", "key2" : "value2"}
+);
 
 mk_test!(
 block mapping simple;
