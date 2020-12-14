@@ -5,10 +5,10 @@ pub(crate) trait ByteExt {
     fn is_linebreak(self) -> bool;
     fn is_ws(self) -> bool;
     fn is_ns_char(self) -> bool;
+    fn is_ns_plain(self, next: Option<u8>, ctx: Option<ParseContext>) -> bool;
     fn is_ns_plain_safe(self, ctx: Option<ParseContext>) -> bool;
     fn is_flow_indicator(self) -> bool;
     fn is_scalar_start(self, next: Option<u8>, ctx: Option<ParseContext>) -> bool;
-    fn is_safe(&self, group: CharGroup) -> bool;
 }
 
 impl ByteExt for u8 {
@@ -60,6 +60,15 @@ impl ByteExt for u8 {
         }
     }
 
+    fn is_ns_plain(self, next: Option<u8>, ctx: Option<ParseContext>) -> bool {
+        let alt1 = self.is_ns_plain_safe(ctx) && self.ne(&b':') && self.ne(&b'#');
+        let alt2 = next.map_or(false, |nxt| {
+            self.is_ns_char() && !self.is_linebreak() && nxt.eq(&b'#')
+        });
+        let alt3 = next.map_or(false, |nxt| self.eq(&b':') && nxt.is_ns_plain_safe(ctx));
+        alt1 || alt2 || alt3
+    }
+
     fn is_scalar_start(self, next: Option<u8>, ctx: Option<ParseContext>) -> bool {
         if self.is_linebreak() {
             return false;
@@ -76,19 +85,4 @@ impl ByteExt for u8 {
             _ => false,
         }
     }
-
-    fn is_safe(&self, group: CharGroup) -> bool {
-        match group {
-            CharGroup::NSPlainIn => {
-                self.is_ns_char() && !self.is_flow_indicator() && !self.is_linebreak()
-            }
-            CharGroup::NSPlainOut => self.is_ns_char() && !self.is_linebreak(),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
-pub(crate) enum CharGroup {
-    NSPlainOut,
-    NSPlainIn,
 }

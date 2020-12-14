@@ -1,8 +1,7 @@
-use crate::bytes::{ByteExt, CharGroup};
+use crate::bytes::ByteExt;
 use crate::{Entry, Yaml, YamlParseError};
 use core::iter::{Iterator, Peekable};
 use std::str::Bytes;
-use std::todo;
 
 use crate::Result;
 
@@ -173,6 +172,7 @@ impl<'a, 'b> Parser<'a> {
 
     fn parse_mapping_maybe(&mut self, node: Yaml<'a>) -> Result<Yaml<'a>> {
         self.chomp_whitespace();
+        self.chomp_comment();
         match self.current {
             b':' if match self.expected.last() {
                 Some(b'}') | Some(b':') => false,
@@ -188,7 +188,12 @@ impl<'a, 'b> Parser<'a> {
     pub(crate) fn parse(&mut self) -> Result<Yaml<'a>> {
         let context = self.context();
         let peeked = self.peek();
+        dbg!(char::from(self.current));
         let res = match self.current {
+            b'#' => {
+                self.chomp_comment();
+                self.parse()?
+            }
             b'-' if self.check_ahead_1(|val| val == b'-')
                 && self.check_ahead_n(2, |val| val == b'-') =>
             {
@@ -232,7 +237,7 @@ impl<'a, 'b> Parser<'a> {
             b if b.is_ws() => {
                 self.chomp_indent();
                 if self.at_end() {
-                    return self.parse_error_with_msg("unexpected end of file");
+                    return self.parse_error_with_msg("unexpected end of input");
                 }
                 self.parse()?
             }
@@ -264,7 +269,6 @@ impl<'a, 'b> Parser<'a> {
     }
 
     pub(crate) fn parse_scalar(&mut self) -> Result<Yaml<'a>> {
-        use TakeUntilCond::MatchOrErr;
         let context = self.context();
         match self.current {
             // TODO: currently qouble quote/single quote scalars are handled identically. maybe handle as defined
@@ -272,7 +276,11 @@ impl<'a, 'b> Parser<'a> {
             b'\"' => {
                 let scal_start = self.idx;
                 self.advance()?;
-                self.take_until(MatchOrErr, |tok, _| matches!(tok, b'\"'))?;
+                let _ = self
+                    .take_while(|tok, _| !matches!(tok, b'\"'))
+                    .map_err(|_| {
+                        self.make_parse_error_with_msg("unexpected end of input; expected '\"'")
+                    })?;
                 let scal_end = if self.bump() {
                     self.idx
                 } else {
@@ -285,7 +293,10 @@ impl<'a, 'b> Parser<'a> {
             b'\'' => {
                 let scal_start = self.idx;
                 self.advance()?;
-                self.take_until(MatchOrErr, |tok, _| matches!(tok, b'\''))?;
+                self.take_while(|tok, _| !matches!(tok, b'\''))
+                    .map_err(|_| {
+                        self.make_parse_error_with_msg("unexpected end of input; expected '\''")
+                    })?;
                 let scal_end = if self.bump() {
                     self.idx
                 } else {
@@ -295,37 +306,12 @@ impl<'a, 'b> Parser<'a> {
                 Ok(Yaml::Scalar(entire_literal))
             }
             _ => {
-                let accept: Box<dyn Fn(u8, u8) -> bool> = match context {
-                    Some(ctx) => match ctx {
-                        ParseContext::FlowOut | ParseContext::BlockKey => {
-                            Box::new(|tok: u8, nxt: u8| {
-                                let safe = |t: u8| t.is_safe(CharGroup::NSPlainOut);
-                                let prod1 = safe(tok) && tok != b':';
-                                let prod3 = tok == b':' && safe(nxt);
-                                prod1 || prod3
-                            })
-                        }
-                        ParseContext::FlowIn | ParseContext::FlowKey => {
-                            Box::new(|tok: u8, nxt: u8| {
-                                let safe = |t: u8| t.is_safe(CharGroup::NSPlainIn);
-                                let prod1 = safe(tok) && tok != b':';
-                                let prod3 = tok == b':' && safe(nxt);
-                                prod1 || prod3
-                            })
-                        }
-                        ParseContext::BlockIn | ParseContext::BlockOut => todo!(),
-                    },
-                    None => Box::new(|tok: u8, nxt: u8| {
-                        let safe = |t: u8| t.is_safe(CharGroup::NSPlainOut);
-                        let prod1 = safe(tok) && tok != b':';
-                        let prod3 = tok == b':' && safe(nxt);
-                        prod1 || prod3
-                    }),
-                };
-                let (start, mut end) = self.take_while(&accept)?;
+                let accept = |tok: u8, nxt: Option<u8>| tok.is_ns_plain(nxt, context);
+                let (start, mut end) = self.take_while(&accept).unwrap_or_else(|val| val);
                 loop {
                     self.chomp_whitespace();
-                    let (s, e) = self.take_while(&accept)?;
+                    self.chomp_comment();
+                    let (s, e) = self.take_while(&accept).unwrap_or_else(|val| val);
                     if s == e {
                         break;
                     } else {
@@ -393,14 +379,18 @@ impl<'a, 'b> Parser<'a> {
         })
     }
 
-    fn parse_error_with_msg<T, S: Into<String>>(&self, msg: S) -> Result<T> {
+    fn make_parse_error_with_msg<S: Into<String>>(&self, msg: S) -> YamlParseError {
         let (line, col) = self.lookup_line_col();
-        Err(YamlParseError {
+        YamlParseError {
             line,
             col,
             msg: Some(msg.into()),
             source: None,
-        })
+        }
+    }
+
+    fn parse_error_with_msg<T, S: Into<String>>(&self, msg: S) -> Result<T> {
+        Err(self.make_parse_error_with_msg(msg))
     }
 
     pub(crate) fn parse_mapping_flow(&mut self) -> Result<Yaml<'a>> {
@@ -425,6 +415,7 @@ impl<'a, 'b> Parser<'a> {
                     let key = self.parse()?;
                     self.end_context(ParseContextKind::FlowMapping)?;
                     self.chomp_whitespace();
+                    self.chomp_comment();
                     match self.current {
                         b':' => {
                             self.pop_if_match(b':')?;
@@ -434,6 +425,7 @@ impl<'a, 'b> Parser<'a> {
                             let value = self.parse()?;
                             self.end_context(ParseContextKind::Flow)?;
                             self.chomp_whitespace();
+                            self.chomp_comment();
                             entries.push(Entry { key, value })
                         }
                         // TODO: Provide error message
@@ -460,7 +452,9 @@ impl<'a, 'b> Parser<'a> {
                 self.advance()?;
                 let mut entries = Vec::new();
                 self.chomp_whitespace();
+                self.chomp_comment();
                 let value = self.parse()?;
+                dbg!(&value);
                 entries.push(Entry::new(start_key, value));
                 loop {
                     match self.current {
@@ -476,11 +470,13 @@ impl<'a, 'b> Parser<'a> {
                         byt if byt.is_ws() => {
                             self.chomp_indent();
                         }
+                        b'#' => self.chomp_comment(),
                         _ if self.indent < indent => break,
                         _ => {
                             self.expected.push(b':');
                             let key = self.parse()?;
                             self.chomp_whitespace();
+                            self.chomp_comment();
                             if let b':' = self.current {
                                 self.pop_if_match(b':')?;
                                 self.advance()?;
@@ -504,6 +500,18 @@ impl<'a, 'b> Parser<'a> {
     fn slice_range(&self, (start, end): (usize, usize)) -> &'a str {
         let end = usize::min(end, self.bytes.len());
         &self.source[start.into()..end.into()]
+    }
+
+    fn chomp_comment(&mut self) {
+        if self.current == b'#' {
+            self.bump();
+            while !self.current.is_linebreak() {
+                if !self.bump() {
+                    break;
+                }
+            }
+            self.bump_newline();
+        }
     }
 
     fn chomp_whitespace(&mut self) {
@@ -545,18 +553,19 @@ impl<'a, 'b> Parser<'a> {
                             self.end_context(ParseContextKind::Flow)?;
                             return Ok(Yaml::Sequence(elements));
                         }
-                        b' ' | b'\t' => {
-                            self.chomp_whitespace();
-                        }
+                        b' ' | b'\t' => self.chomp_whitespace(),
+
+                        b'#' => self.chomp_comment(),
                         _ => {
                             let elem = self.parse()?;
                             elements.push(elem);
                             self.chomp_whitespace();
+
                             match self.current {
                                 b',' => {
                                     self.advance()?;
-                                    continue;
                                 }
+                                b'#' => self.chomp_comment(),
                                 b']' => {
                                     self.bump();
                                     self.end_context(ParseContextKind::Flow)?;
@@ -602,6 +611,7 @@ impl<'a, 'b> Parser<'a> {
                 loop {
                     match self.current {
                         _ if self.at_end() => break,
+                        b'#' => self.chomp_comment(),
                         byt if byt.is_linebreak() => {
                             self.indent = 0;
                             if self.bump_newline() {
@@ -661,47 +671,19 @@ impl<'a, 'b> Parser<'a> {
         }
     }
 
-    fn take_while(&mut self, accept: impl Fn(u8, u8) -> bool) -> Result<(usize, usize)> {
+    fn take_while(
+        &mut self,
+        accept: impl Fn(u8, Option<u8>) -> bool,
+    ) -> std::result::Result<(usize, usize), (usize, usize)> {
         let start = self.idx;
         let mut end = start;
         loop {
             let peeked = self.peek();
-            if !match peeked {
-                Some(byte) => accept(self.current, byte),
-                None => accept(self.current, u8::default()),
-            } {
+            if !accept(self.current, peeked) {
                 break;
             } else if !self.bump() {
                 end += 1;
-                break;
-            }
-            end += 1;
-        }
-        Ok((start, end))
-    }
-
-    fn take_until(
-        &mut self,
-        cond: TakeUntilCond,
-        stop: impl Fn(u8, u8) -> bool,
-    ) -> Result<(usize, usize)> {
-        let start = self.idx;
-        let mut end = start;
-        loop {
-            let peeked = self.peek();
-            if match peeked {
-                Some(tok_kind) => stop(self.current, tok_kind),
-                None => stop(self.current, u8::default()),
-            } {
-                break;
-            } else if !self.bump() {
-                return match cond {
-                    TakeUntilCond::MatchOrEnd => Ok((start, self.bytes.len())),
-                    // TODO: Provide error message
-                    TakeUntilCond::MatchOrErr => {
-                        self.parse_error_with_msg("failed to find expected tokens")
-                    }
-                };
+                return Err((start, end));
             }
             end += 1;
         }
@@ -718,10 +700,4 @@ impl<'a, 'b> Parser<'a> {
             _ => self.parse_error_with_msg("token was not expected"),
         }
     }
-}
-#[derive(Clone, Copy)]
-enum TakeUntilCond {
-    #[allow(unused)]
-    MatchOrEnd,
-    MatchOrErr,
 }
