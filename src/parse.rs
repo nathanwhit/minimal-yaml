@@ -177,7 +177,6 @@ impl<'a, 'b> Parser<'a> {
     pub(crate) fn parse(&mut self) -> Result<Yaml<'a>> {
         let context = self.context();
         let peeked = self.peek();
-        dbg!(char::from(self.current));
         let res = match self.current {
             b'#' => {
                 self.chomp_comment();
@@ -440,7 +439,6 @@ impl<'a, 'b> Parser<'a> {
                 self.chomp_whitespace();
                 self.chomp_comment();
                 let value = self.parse()?;
-                dbg!(&value);
                 entries.push(Entry::new(start_key, value));
                 loop {
                     match self.current {
