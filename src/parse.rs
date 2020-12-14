@@ -1,4 +1,4 @@
-use crate::tokenize::{ByteExt, CharGroup};
+use crate::bytes::{ByteExt, CharGroup};
 use crate::{Entry, Yaml, YamlParseError};
 use core::iter::{Iterator, Peekable};
 use std::str::Bytes;

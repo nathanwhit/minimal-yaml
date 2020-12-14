@@ -1,8 +1,8 @@
 #![warn(clippy::all, clippy::pedantic)]
+mod bytes;
 mod errors;
 mod parse;
 mod tests;
-mod tokenize;
 
 pub use crate::errors::YamlParseError;
 

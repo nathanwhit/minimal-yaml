@@ -1,183 +1,48 @@
 #![cfg(test)]
 #![allow(clippy::pedantic)]
 
-use crate::{
-    parse, Entry, Yaml,
-    Yaml::{Mapping, Scalar, Sequence},
-    YamlParseError,
-};
+#[macro_use]
+mod macros;
 
-impl<'a> From<&'a str> for Yaml<'a> {
+use crate::YamlParseError;
+
+impl<'a> From<&'a str> for crate::Yaml<'a> {
     fn from(other: &'a str) -> Self {
-        Yaml::Scalar(other)
+        crate::Yaml::Scalar(other)
     }
-}
-
-#[allow(unused)]
-macro_rules! custom_test {
-    (
-        #[test(timeout = $timeout:expr)]
-        $( #[$meta:meta] )*
-        fn $fname:ident $($rest:tt)*
-    ) => (
-        #[test]
-        $( #[$meta] )*
-        fn $fname ()
-        {
-            let (done_tx, done_rx) = ::std::sync::mpsc::channel();
-            let handle =
-                ::std::thread::Builder::new()
-                    .name(
-                        concat!(module_path!(), "::", stringify!($fname))
-                            .splitn(2, "::").nth(1).unwrap()
-                            .into()
-                    )
-                    .spawn(move || {
-                        {
-                            fn $fname $($rest)*
-                            $fname();
-                        }
-                        let _ = done_tx.send(());
-                    })
-                    .unwrap()
-            ;
-
-            match done_rx.recv_timeout({
-                use ::std::time::*;
-                $timeout
-            }) {
-                | Err(::std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    panic!("Test took too long");
-                },
-                | _ => if let Err(err) = handle.join() {
-                    ::std::panic::resume_unwind(err);
-                },
-            }
-        }
-    );
-
-    (
-        $($tt:tt)*
-    ) => (
-        $($tt)*
-    );
-}
-
-macro_rules! mk_test {
-    ($($name: ident) +; $inp: expr => fail) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &str = $inp;
-                parse(input).unwrap_err();
-            }
-        }
-    };
-    (timeout = $e:expr; $($name: ident) +; $inp: expr => $exp: expr) => {
-        paste::item! {
-            custom_test! {
-                #[test(timeout = $e)]
-                fn [<test_parse_$($name _)+>] () {
-                    let input: &str = $inp;
-                    assert_eq!(parse(input).unwrap(), $exp);
-                }
-            }
-        }
-    };
-    ($($name: ident) +; $inp: expr => $exp: expr) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &str = $inp;
-                assert_eq!(parse(input).unwrap(), $exp);
-            }
-        }
-    };
-    ($($name: ident) +; $inp: expr => err $exp: expr) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &str = $inp;
-                assert_eq!(parse(input).unwrap_err(), $exp);
-            }
-        }
-    };
-    ($($name: ident) +; $inp: expr => matches bytes $exp: expr) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &[u8] = $inp;
-                assert!(
-                    match try_parse_from_utf8(input) {
-                        $exp => true,
-                        _ => false,
-                    }
-                );
-            }
-        }
-    };
-    ($($name: ident) +; $inp: stmt => matches $exp: expr) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &str = $inp;
-                assert!(
-                    match parse(input) {
-                        $exp => true,
-                        _ => false,
-                    }
-                );
-            }
-        }
-    };
-    ($($name: ident) +; $inp: expr => err msg $exp: expr) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &str = $inp;
-                assert_eq!(parse(input).unwrap_err().to_string(), $exp);
-            }
-        }
-    };
 }
 
 // Scalars
 
 mk_test!(
     double quote scalar whitespace;
-    r#""a scalar value with whitespace""# => Scalar(r#""a scalar value with whitespace""#)
+    r#""a scalar value with whitespace""# => r#""a scalar value with whitespace""#
 );
 
 mk_test!(
     double quote scalar no whitespace;
-    r#""a_scalarvaluewithout_whitespace""# => Scalar(r#""a_scalarvaluewithout_whitespace""#)
+    r#""a_scalarvaluewithout_whitespace""# => r#""a_scalarvaluewithout_whitespace""#
 );
 
 mk_test!(
     single quote scalar whitespace;
-    r#"'a scalar value with whitespace'"# => Scalar(r#"'a scalar value with whitespace'"#)
+    r#"'a scalar value with whitespace'"# => r#"'a scalar value with whitespace'"#
 );
 
 mk_test!(
     single quote scalar no whitespace;
-    r#"'ascalarvalue_without_whitespace'"# => Scalar(r#"'ascalarvalue_without_whitespace'"#)
+    r#"'ascalarvalue_without_whitespace'"# => r#"'ascalarvalue_without_whitespace'"#
 );
 
 mk_test!(
     no quote scalar whitespace;
-    "an unquoted scalar value with whitespace" => Scalar("an unquoted scalar value with whitespace")
+    "an unquoted scalar value with whitespace" => "an unquoted scalar value with whitespace"
 );
 
 mk_test!(
     no quote scalar no whitespace;
-    "anunquoted_scalar_value_withoutwhitespace" => Scalar("anunquoted_scalar_value_withoutwhitespace")
+    "anunquoted_scalar_value_withoutwhitespace" => "anunquoted_scalar_value_withoutwhitespace"
 );
-
-macro_rules! seq {
-    ($($val: expr),*) => {
-        Sequence(vec![$( $val.into() ),*])
-    }
-}
 
 // Flow Sequences
 
@@ -219,17 +84,6 @@ mk_test!(
     mixed kind flow sequence quotes;
     r#"[" elem " , [ a, 'b ' , "   c "]]"# => seq!(r#"" elem ""#, seq!("a", r"'b '", r#""   c ""#))
 );
-
-// Macro
-
-macro_rules! map {
-    { $($key : tt : $val : tt),* } => {
-        Mapping(vec![$(Entry { key: $key.into() , value: $val.into() }),*])
-    };
-    { $($key : expr => $val : expr);* } => {
-        Mapping(vec![$(Entry { key: $key.into() , value: $val.into() }),*])
-    }
-}
 
 // Flow mappings
 
