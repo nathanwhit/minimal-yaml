@@ -67,14 +67,7 @@ impl<'a, 'b> Parser<'a> {
     fn start_context(&mut self, context_kind: ParseContextKind) -> Result<()> {
         let context = match self.context() {
             Some(ctx) => match context_kind {
-                ParseContextKind::Flow => match ctx {
-                    ParseContext::FlowKey | ParseContext::FlowIn | ParseContext::FlowOut => {
-                        ParseContext::FlowIn
-                    }
-                    ParseContext::BlockKey | ParseContext::BlockIn | ParseContext::BlockOut => {
-                        ParseContext::FlowIn
-                    }
-                },
+                ParseContextKind::Flow => ParseContext::FlowIn,
                 ParseContextKind::FlowMapping => ParseContext::FlowKey,
                 ParseContextKind::Block => match ctx {
                     ParseContext::FlowIn | ParseContext::FlowOut | ParseContext::FlowKey => {
@@ -128,7 +121,7 @@ impl<'a, 'b> Parser<'a> {
     }
 
     fn context(&self) -> Option<ParseContext> {
-        self.contexts.last().map(|&c| c)
+        self.contexts.last().copied()
     }
 
     fn bump(&mut self) -> bool {
@@ -174,11 +167,7 @@ impl<'a, 'b> Parser<'a> {
         self.chomp_whitespace();
         self.chomp_comment();
         match self.current {
-            b':' if match self.expected.last() {
-                Some(b'}') | Some(b':') => false,
-                _ => true,
-            } =>
-            {
+            b':' if !matches!(self.expected.last(), Some(b'}') | Some(b':')) => {
                 self.parse_mapping_block(node)
             }
             _ => Ok(node),
@@ -220,14 +209,11 @@ impl<'a, 'b> Parser<'a> {
                 let node = self.parse_sequence_flow()?;
                 self.parse_mapping_maybe(node)?
             }
-            b'-' => match context {
-                _ => match self.peek() {
-                    Some(byt) if byt.is_linebreak() || byt.is_ws() => {
-                        self.parse_sequence_block()?
-                    }
-                    byt => unreachable!(format!("unexpected {:?}", byt.map(char::from))),
-                },
+            b'-' => match self.peek() {
+                Some(byt) if byt.is_linebreak() || byt.is_ws() => self.parse_sequence_block()?,
+                byt => unreachable!(format!("unexpected {:?}", byt.map(char::from))),
             },
+
             b'}' | b']' => {
                 return self.parse_error_with_msg(format!(
                     r#"unexpected symbol '{}'"#,
@@ -328,7 +314,7 @@ impl<'a, 'b> Parser<'a> {
     }
 
     fn lookup_line_col(&self) -> (usize, usize) {
-        let err_off: usize = usize::from(self.idx) + 1;
+        let err_off: usize = self.idx + 1;
         let mut off = 0;
         let mut line_len = 0;
         let mut chars = self.source.chars().map(|c| (c, c.len_utf8()));
@@ -499,7 +485,7 @@ impl<'a, 'b> Parser<'a> {
 
     fn slice_range(&self, (start, end): (usize, usize)) -> &'a str {
         let end = usize::min(end, self.bytes.len());
-        &self.source[start.into()..end.into()]
+        &self.source[start..end]
     }
 
     fn chomp_comment(&mut self) {
@@ -624,7 +610,7 @@ impl<'a, 'b> Parser<'a> {
                         }
                         _ if self.indent < indent => break,
                         b'-' => {
-                            if self.check_ahead_1(|t| t.is_linebreak()) {
+                            if self.check_ahead_1(ByteExt::is_linebreak) {
                                 self.advance()?;
                                 self.advance()?;
                                 self.indent = 0;
@@ -642,7 +628,7 @@ impl<'a, 'b> Parser<'a> {
                                     let node = self.parse()?;
                                     seq.push(node);
                                 }
-                            } else if self.check_ahead_1(|t| t.is_ws()) {
+                            } else if self.check_ahead_1(ByteExt::is_ws) {
                                 self.advance()?;
                                 self.advance()?;
                                 let node = self.parse()?;

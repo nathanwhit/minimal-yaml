@@ -173,7 +173,7 @@ impl<'a> Display for Entry<'a> {
 /// # Errors
 /// Returns `Err` if the input is invalid Yaml, with a message indicating
 /// where the error occurred and possibly more information on the cause
-pub fn parse<'a>(input: &'a str) -> Result<Yaml<'a>> {
+pub fn parse(input: &str) -> Result<Yaml<'_>> {
     let mut parser = Parser::new(input)?;
     parser.parse()
 }
