@@ -1,122 +1,45 @@
 #![cfg(test)]
 #![allow(clippy::pedantic)]
 
-use crate::{
-    parse, Entry, Yaml,
-    Yaml::{Mapping, Scalar, Sequence},
-    YamlParseError,
-};
+use crate::YamlParseError;
 
-impl<'a> From<&'a str> for Yaml<'a> {
+impl<'a> From<&'a str> for crate::Yaml<'a> {
     fn from(other: &'a str) -> Self {
-        Yaml::Scalar(other)
+        crate::Yaml::Scalar(other)
     }
-}
-
-macro_rules! mk_test {
-    ($($name: ident) +; $inp: expr => fail) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &str = $inp;
-                parse(input).unwrap_err();
-            }
-        }
-    };
-    ($($name: ident) +; $inp: expr => $exp: expr) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &str = $inp;
-                assert_eq!(parse(input).unwrap(), $exp);
-            }
-        }
-    };
-    ($($name: ident) +; $inp: expr => err $exp: expr) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &str = $inp;
-                assert_eq!(parse(input).unwrap_err(), $exp);
-            }
-        }
-    };
-    ($($name: ident) +; $inp: expr => matches bytes $exp: expr) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &[u8] = $inp;
-                assert!(
-                    match try_parse_from_utf8(input) {
-                        $exp => true,
-                        _ => false,
-                    }
-                );
-            }
-        }
-    };
-    ($($name: ident) +; $inp: stmt => matches $exp: expr) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &str = $inp;
-                assert!(
-                    match parse(input) {
-                        $exp => true,
-                        _ => false,
-                    }
-                );
-            }
-        }
-    };
-    ($($name: ident) +; $inp: expr => err msg $exp: expr) => {
-        paste::item! {
-            #[test]
-            fn [<test_parse_$($name _)+>] () {
-                let input: &str = $inp;
-                assert_eq!(parse(input).unwrap_err().to_string(), $exp);
-            }
-        }
-    };
 }
 
 // Scalars
 
 mk_test!(
     double quote scalar whitespace;
-    r#""a scalar value with whitespace""# => Scalar(r#""a scalar value with whitespace""#)
+    r#""a scalar value with whitespace""# => r#""a scalar value with whitespace""#
 );
 
 mk_test!(
     double quote scalar no whitespace;
-    r#""a_scalarvaluewithout_whitespace""# => Scalar(r#""a_scalarvaluewithout_whitespace""#)
+    r#""a_scalarvaluewithout_whitespace""# => r#""a_scalarvaluewithout_whitespace""#
 );
 
 mk_test!(
     single quote scalar whitespace;
-    r#"'a scalar value with whitespace'"# => Scalar(r#"'a scalar value with whitespace'"#)
+    r#"'a scalar value with whitespace'"# => r#"'a scalar value with whitespace'"#
 );
 
 mk_test!(
     single quote scalar no whitespace;
-    r#"'ascalarvalue_without_whitespace'"# => Scalar(r#"'ascalarvalue_without_whitespace'"#)
+    r#"'ascalarvalue_without_whitespace'"# => r#"'ascalarvalue_without_whitespace'"#
 );
 
 mk_test!(
     no quote scalar whitespace;
-    "an unquoted scalar value with whitespace" => Scalar("an unquoted scalar value with whitespace")
+    "an unquoted scalar value with whitespace" => "an unquoted scalar value with whitespace"
 );
 
 mk_test!(
     no quote scalar no whitespace;
-    "anunquoted_scalar_value_withoutwhitespace" => Scalar("anunquoted_scalar_value_withoutwhitespace")
+    "anunquoted_scalar_value_withoutwhitespace" => "anunquoted_scalar_value_withoutwhitespace"
 );
-
-macro_rules! seq {
-    ($($val: expr),*) => {
-        Sequence(vec![$( $val.into() ),*])
-    }
-}
 
 // Flow Sequences
 
@@ -158,17 +81,6 @@ mk_test!(
     mixed kind flow sequence quotes;
     r#"[" elem " , [ a, 'b ' , "   c "]]"# => seq!(r#"" elem ""#, seq!("a", r"'b '", r#""   c ""#))
 );
-
-// Macro
-
-macro_rules! map {
-    { $($key : tt : $val : tt),* } => {
-        Mapping(vec![$(Entry { key: $key.into() , value: $val.into() }),*])
-    };
-    { $($key : expr => $val : expr);* } => {
-        Mapping(vec![$(Entry { key: $key.into() , value: $val.into() }),*])
-    }
-}
 
 // Flow mappings
 
@@ -269,6 +181,15 @@ r#"
 );
 
 mk_test!(
+super simple block sequence nested;
+r#"
+-
+  - " a "
+  - ' nested'
+"# => seq!(seq!(r#"" a ""#, r"' nested'"))
+);
+
+mk_test!(
 block sequence multiple nested;
 r##"
 -
@@ -323,6 +244,14 @@ r##"
 );
 
 // Block mappings
+
+mk_test!(
+super simple;
+r#"
+key : value
+key2 : value2
+"# => map! { "key" : "value", "key2" : "value2"}
+);
 
 mk_test!(
 block mapping simple;
@@ -391,6 +320,19 @@ key: #comment 1
         "value line 3"
     )
 }
+);
+
+mk_test!(
+scalar with pound in middle;
+r#"
+- foo#bar
+- "baz#bax"
+- 'quux#xyzzy'
+"# => seq!(
+        "foo",
+        r##""baz#bax""##,
+        r"'quux#xyzzy'"
+    )
 );
 
 mk_test!(

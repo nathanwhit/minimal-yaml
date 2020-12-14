@@ -13,4 +13,4 @@ homepage = "https://github.com/nathanwhit/minimal-yaml/"
 
 [dev-dependencies]
 paste = "0.1.6"
-serde = {version = "1.0.104", features = ["derive"]}
+serde = { version = "1.0.104", features = ["derive"] }
